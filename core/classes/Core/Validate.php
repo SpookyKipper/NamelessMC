@@ -184,7 +184,7 @@ class Validate
                     }
                 }
 
-                if (empty($value)) {
+                if (empty($value) && $value !== '0') {
                     continue;
                 }
 

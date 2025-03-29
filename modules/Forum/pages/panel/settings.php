@@ -35,13 +35,27 @@ if (Input::exists()) {
     if (Token::check()) {
         $validation = Validate::check($_POST, [
             'news_items' => [
-                Validate::MIN => 0,
-                Validate::MAX => 20,
+                Validate::REQUIRED => true,
+                Validate::NUMERIC => true,
+                Validate::AT_LEAST => 0,
+                Validate::AT_MOST => 20,
+            ],
+            'spam_timer' => [
+                Validate::REQUIRED => true,
+                Validate::NUMERIC => true,
+                Validate::AT_LEAST => 1,
             ],
         ])->messages([
             'news_items' => [
-                Validate::MIN => static fn($meta) => $forum_language->get('forum', 'news_items_min', $meta),
-                Validate::MAX => static fn($meta) => $forum_language->get('forum', 'news_items_max', $meta),
+                Validate::REQUIRED => $forum_language->get('forum', 'news_items_required'),
+                Validate::NUMERIC => $forum_language->get('forum', 'news_items_numeric'),
+                Validate::AT_LEAST => static fn($meta) => $forum_language->get('forum', 'news_items_min', $meta),
+                Validate::AT_MOST => static fn($meta) => $forum_language->get('forum', 'news_items_max', $meta),
+            ],
+            'spam_timer' => [
+                Validate::REQUIRED => $forum_language->get('forum', 'spam_timer_required'),
+                Validate::NUMERIC => $forum_language->get('forum', 'spam_timer_numeric'),
+                Validate::AT_LEAST => static fn($meta) => $forum_language->get('forum', 'spam_timer_min', $meta),
             ],
         ]);
 
@@ -68,6 +82,7 @@ if (Input::exists()) {
 
             Settings::set('forum_reactions', (isset($_POST['use_reactions']) && $_POST['use_reactions'] == 'on') ? '1' : 0);
             Settings::set('news_items_front_page', $_POST['news_items'], 'forum');
+            Settings::set('spam_timer', $_POST['spam_timer'], 'forum');
             Settings::set('banned_terms', $_POST['banned_terms'], 'forum');
 
             Session::flash('admin_forums_settings', $forum_language->get('forum', 'settings_updated_successfully'));
@@ -125,6 +140,9 @@ $template->getEngine()->addVariables([
     'USE_REACTIONS_VALUE' => Settings::get('forum_reactions') === '1',
     'NEWS_ITEMS_ON_FRONT_PAGE' => $forum_language->get('forum', 'news_items_front_page_limit'),
     'NEWS_ITEMS_ON_FRONT_PAGE_VALUE' => Settings::get('news_items_front_page', 5, 'forum'),
+    'SPAM_TIMER' => $forum_language->get('forum', 'spam_timer'),
+    'SPAM_TIMER_INFO' => $forum_language->get('forum', 'spam_timer_info'),
+    'SPAM_TIMER_VALUE' => Settings::get('spam_timer', 30, 'forum'),
     'BANNED_TERMS' => $forum_language->get('forum', 'banned_terms'),
     'BANNED_TERMS_INFO' => $forum_language->get('forum', 'banned_terms_info'),
     'BANNED_TERMS_VALUE' => Output::getClean(Settings::get('banned_terms', '', 'forum')),

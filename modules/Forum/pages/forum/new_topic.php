@@ -104,14 +104,19 @@ if (count($forum_labels)) {
 if (Input::exists()) {
     if (Token::check()) {
         // Check post limits
-        $last_post = DB::getInstance()->orderWhere('posts', 'post_creator = ' . $user->data()->id, 'post_date', 'DESC LIMIT 1')->results();
-        if (count($last_post)) {
-            if ($last_post[0]->created > strtotime('-30 seconds')) {
-                $spam_check = true;
+        $spamTimer = Settings::get('spam_timer', 30, 'forum');
+        $lastPost = DB::getInstance()->query(
+            'SELECT `created` FROM nl2_posts WHERE post_creator = ? ORDER BY `created` DESC LIMIT 1',
+            [$user->data()->id]
+        );
+
+        if ($lastPost->count()) {
+            if ($lastPost->first()->created > strtotime("-$spamTimer seconds")) {
+                $spamCheck = true;
             }
         }
 
-        if (!isset($spam_check)) {
+        if (!isset($spamCheck)) {
             // Spam check passed
             $validate = Validate::check($_POST, [
                 'title' => [
@@ -230,7 +235,7 @@ if (Input::exists()) {
                 $error = $validate->errors();
             }
         } else {
-            $error = [$forum_language->get('forum', 'spam_wait', ['count' => (strtotime($last_post[0]->post_date) - strtotime('-30 seconds'))])];
+            $error = [$forum_language->get('forum', 'spam_wait', ['count' => ($lastPost->first()->created - strtotime("-$spamTimer seconds"))])];
         }
     } else {
         $error = [$language->get('general', 'invalid_token')];
