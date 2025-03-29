@@ -398,10 +398,15 @@ if ($user->isLoggedIn() || (defined('COOKIE_CHECK') && COOKIES_ALLOWED)) {
         DB::getInstance()->increment('topics', $tid, 'topic_views');
         Cookie::put('nl-topic-' . $tid, 'true', 3600);
     }
-} else {
-    if (!Session::exists('nl-topic-' . $tid)) {
+} elseif (!Session::exists('nl-topic-' . $tid)) {
+    // Fall back to IP check
+    $ip = HttpUtils::getRemoteAddress();
+    $cache->setCache("forum_views_$tid");
+
+    if (!$cache->isCached($ip)) {
         DB::getInstance()->increment('topics', $tid, 'topic_views');
         Session::put('nl-topic-' . $tid, 'true');
+        $cache->store($ip, true, 3600);
     }
 }
 
