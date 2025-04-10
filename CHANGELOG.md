@@ -1,7 +1,17 @@
 # NamelessMC v2 Changelog
 
-## [Unreleased](https://github.com/NamelessMC/Nameless/compare/v2.1.3...develop)
+## [Unreleased](https://github.com/NamelessMC/Nameless/compare/v2.1.4...develop)
 > [Milestone](https://github.com/NamelessMC/Nameless/milestone/22)
+
+## [2.1.4](https://github.com/NamelessMC/Nameless/compare/v2.1.3...v2.1.4) - 2025-04-10
+### Added
+- No additions this release
+
+### Changed
+- No changes this release
+
+### Fixed
+- Throw invalid argument exception if clause is not an array when constructing where clauses
 
 ## [2.1.3](https://github.com/NamelessMC/Nameless/compare/v2.1.2...v2.1.3) - 2025-01-08
 ### Added

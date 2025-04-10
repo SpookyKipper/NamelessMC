@@ -20,8 +20,8 @@ class Members_Module extends Module {
 
         $name = 'Members';
         $author = '<a href="https://tadhg.sh" target="_blank" rel="nofollow noopener">Aberdeener</a>';
-        $module_version = '2.1.3';
-        $nameless_version = '2.1.3';
+        $module_version = '2.1.4';
+        $nameless_version = '2.1.4';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
