@@ -1,4 +1,5 @@
 <?php
+
 /*
  *  Made by Samerton
  *  https://github.com/NamelessMC/Nameless/
@@ -74,6 +75,10 @@ switch ($_POST['type']) {
         $folder = 'favicons';
         break;
 
+    case 'og_image':
+        $folder = 'og_images';
+        break;
+
     case 'default_avatar':
         $folder = implode(DIRECTORY_SEPARATOR, ['avatars', 'defaults']);
         break;
@@ -115,7 +120,7 @@ if ($image['file']) {
                 Redirect::to(URL::build('/profile/' . urlencode($user->data()->username)));
             }
 
-            http_response_code(500);
+            http_response_code(\Symfony\Component\HttpFoundation\Response::HTTP_BAD_REQUEST);
             $error = $image->getError() ?: 'Unknown error, check logs for more details';
             ErrorHandler::logWarning('Image upload error: ' . $error);
             die($error);
@@ -134,7 +139,7 @@ if ($image['file']) {
 
             $user->update([
                 'has_avatar' => true,
-                'avatar_updated' => date('U')
+                'avatar_updated' => date('U'),
             ]);
 
             Session::flash('settings_success', $language->get('user', 'avatar_set_successfully'));
@@ -143,7 +148,7 @@ if ($image['file']) {
 
         if (Input::get('type') === 'profile_banner') {
             $user->update([
-                'banner' => Output::getClean($user->data()->id . '/' . $image->getName() . '.' . $image->getMime())
+                'banner' => Output::getClean($user->data()->id . '/' . $image->getName() . '.' . $image->getMime()),
             ]);
 
             Redirect::to(URL::build('/profile/' . urlencode($user->data()->username)));
@@ -151,7 +156,7 @@ if ($image['file']) {
 
         die('OK');
     } catch (Exception $e) {
-        http_response_code(500);
+        http_response_code(\Symfony\Component\HttpFoundation\Response::HTTP_BAD_REQUEST);
         $error = $e->getMessage() ?: 'Unknown error, check logs for more details';
         ErrorHandler::logWarning('Image upload exception: ' . $error);
         die($error);

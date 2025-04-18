@@ -1,11 +1,10 @@
 <?php
-
 /*
  *  Made by Samerton
  *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr8
+ *  NamelessMC version 2.2.0
  *
- *  License: MIT
+ *  Licence: MIT
  *
  *  Online users widget
  */
@@ -15,23 +14,15 @@ class OnlineUsersWidget extends WidgetBase {
     private Cache $_cache;
     private Language $_language;
 
-    public function __construct(Cache $cache, Smarty $smarty, Language $language) {
-        $this->_smarty = $smarty;
-        $this->_cache = $cache;
-        $this->_language = $language;
-
-        // Get widget
-        $widget_query = self::getData('Online Users');
-
-        parent::__construct(self::parsePages($widget_query));
-
-        // Set widget variables
+    public function __construct(Cache $cache, TemplateEngine $engine, Language $language) {
         $this->_module = 'Core';
         $this->_name = 'Online Users';
-        $this->_location = $widget_query->location;
         $this->_description = 'Displays a list of online users on your website.';
         $this->_settings = ROOT_PATH . '/modules/Core/includes/admin_widgets/online_users.php';
-        $this->_order = $widget_query->order;
+
+        $this->_engine = $engine;
+        $this->_cache = $cache;
+        $this->_language = $language;
     }
 
     public function initialise(): void {
@@ -57,7 +48,7 @@ class OnlineUsersWidget extends WidgetBase {
             if ($include_staff) {
                 $online = DB::getInstance()->query('SELECT id FROM nl2_users WHERE last_online > ?', [strtotime('-5 minutes')])->results();
             } else {
-                $online = DB::getInstance()->query('SELECT U.id FROM nl2_users AS U JOIN nl2_users_groups AS UG ON (U.id = UG.user_id) JOIN nl2_groups AS G ON (UG.group_id = G.id) WHERE G.order = (SELECT min(iG.`order`) FROM nl2_users_groups AS iUG JOIN nl2_groups AS iG ON (iUG.group_id = iG.id) WHERE iUG.user_id = U.id GROUP BY iUG.user_id ORDER BY NULL) AND U.last_online > ' . strtotime('-5 minutes') . ' AND G.staff = 0', [])->results();
+                $online = DB::getInstance()->query('SELECT U.id FROM nl2_users AS U JOIN nl2_users_groups AS UG ON (U.id = UG.user_id) JOIN nl2_groups AS G ON (UG.group_id = G.id) WHERE G.order = (SELECT min(iG.`order`) FROM nl2_users_groups AS iUG JOIN nl2_groups AS iG ON (iUG.group_id = iG.id) WHERE iUG.user_id = U.id GROUP BY iUG.user_id ORDER BY NULL) AND U.last_online > ' . strtotime('-5 minutes') . ' AND G.staff = 0')->results();
             }
 
             $this->_cache->store('users', $online, 120);
@@ -68,6 +59,10 @@ class OnlineUsersWidget extends WidgetBase {
             $users = [];
 
             foreach ($online as $item) {
+                if (count($users) === 10) {
+                    break;
+                }
+
                 $online_user = new User($item->id);
                 if ($online_user->exists()) {
                     $users[] = [
@@ -83,21 +78,21 @@ class OnlineUsersWidget extends WidgetBase {
                 }
             }
 
-            $this->_smarty->assign([
+            $this->_engine->addVariables([
                 'SHOW_NICKNAME_INSTEAD' => $use_nickname_show,
                 'ONLINE_USERS' => $this->_language->get('general', 'online_users'),
                 'ONLINE_USERS_LIST' => $users,
-                'TOTAL_ONLINE_USERS' => $this->_language->get('general', 'total_online_users', ['count' => count($users)])
+                'TOTAL_ONLINE_USERS' => $this->_language->get('general', 'total_online_users', ['count' => count($online)])
             ]);
 
         } else {
-            $this->_smarty->assign([
+            $this->_engine->addVariables([
                 'ONLINE_USERS' => $this->_language->get('general', 'online_users'),
                 'NO_USERS_ONLINE' => $this->_language->get('general', 'no_online_users'),
                 'TOTAL_ONLINE_USERS' => $this->_language->get('general', 'total_online_users', ['count' => 0])
             ]);
         }
 
-        $this->_content = $this->_smarty->fetch('widgets/online_users.tpl');
+        $this->_content = $this->_engine->fetch('widgets/online_users');
     }
 }

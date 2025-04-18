@@ -1,8 +1,9 @@
 <?php
+
 /*
  *  Made by Samerton
  *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.2
+ *  NamelessMC version 2.1.1
  *
  *  License: MIT
  *
@@ -34,13 +35,24 @@ $writable_check_paths = [
     ROOT_PATH . '/cache/sitemaps',
     ROOT_PATH . '/cache/templates_c',
     ROOT_PATH . '/uploads',
-    ROOT_PATH . '/core/config.php'
+    ROOT_PATH . '/core/config.php',
 ];
 
 foreach ($writable_check_paths as $path) {
     if (is_dir($path) && !is_writable($path)) {
-        die('<p>Your website directory or a subdirectory is not writable. Please ensure all files and directories are owned by
-        the correct user.</p><p><strong>Example</strong> command to change owner recursively: <code>sudo chown -R www-data: ' . Output::getClean(ROOT_PATH) . '</code></p>');
+        $message = '<p>Your website directory or a subdirectory is not writable. Please ensure all files and directories are owned by
+        the correct user.</p>';
+
+        if (function_exists('posix_geteuid')) {
+            $uid = posix_geteuid();
+            $gid = posix_getegid();
+            $chown_command = 'sudo chown -R ' . $uid . ':' . $gid . ' ' . Output::getClean(ROOT_PATH);
+            $message .= '<p>The command to fix this for your system was determined to be: <code>' . $chown_command . '</code>. Please check if it makes sense before running it.</p>';
+        } else {
+            $message .= '<p><strong>Example</strong> command to change owner recursively: <code>sudo chown -R www-data: ' . Output::getClean(ROOT_PATH) . '</code></p>';
+        }
+
+        die($message);
     }
 }
 
@@ -60,6 +72,7 @@ if (!Config::exists()) {
 if (isset($_GET['route']) && rtrim($_GET['route'], '/') == '/panel/upgrade') {
     $pages = new Pages();
     $pages->add('Core', '/panel/upgrade', 'pages/panel/upgrade.php');
+
     return;
 }
 
@@ -68,11 +81,19 @@ if ($page != 'install') {
      * Initialise
      */
 
+    $container = new \DI\Container();
+    $container->set(Cache::class, function () {
+        return new Cache([
+            'name' => 'nameless',
+            'extension' => '.cache',
+            'path' => ROOT_PATH . '/cache/',
+        ]);
+    });
+
+    $cache = $container->get(Cache::class);
+
     // Friendly URLs?
     define('FRIENDLY_URLS', Config::get('core.friendly') == 'true');
-
-    // Set up cache
-    $cache = new Cache(['name' => 'nameless', 'extension' => '.cache', 'path' => ROOT_PATH . '/cache/']);
 
     // Force https/www?
     if (Config::get('core.force_https')) {
@@ -92,17 +113,17 @@ if ($page != 'install') {
             } else {
                 Redirect::to('https://' . $host . $_SERVER['REQUEST_URI']);
             }
-        } else if (defined('FORCE_WWW') && !str_contains($host, 'www.')) {
+        } elseif (defined('FORCE_WWW') && !str_contains($host, 'www.')) {
             Redirect::to(HttpUtils::getProtocol() . '://www.' . $host . $_SERVER['REQUEST_URI']);
         }
     }
 
     // Ensure database is up-to-date
-    PhinxAdapter::ensureUpToDate();
+//    PhinxAdapter::ensureUpToDate('Core');
 
     // Error reporting
     if (!defined('DEBUGGING')) {
-        if (Util::getSetting('error_reporting') === '1') {
+        if (Settings::get('error_reporting') === '1') {
             ini_set('display_startup_errors', 1);
             ini_set('display_errors', 1);
             error_reporting(-1);
@@ -114,15 +135,13 @@ if ($page != 'install') {
         }
     }
 
-    $smarty = new Smarty();
-
     if ((defined('DEBUGGING') && DEBUGGING) && class_exists('DebugBar\DebugBar')) {
         define('PHPDEBUGBAR', true);
-        DebugBarHelper::getInstance()->enable($smarty);
+        DebugBarHelper::getInstance()->enable();
     }
 
     // Get the Nameless version
-    define('NAMELESS_VERSION', Util::getSetting('nameless_version'));
+    define('NAMELESS_VERSION', Settings::get('nameless_version'));
 
     // Set the date format
     define('DATE_FORMAT', Config::get('core.date_format') ?: 'd M Y, H:i');
@@ -173,7 +192,7 @@ if ($page != 'install') {
     }
 
     // Set timezone
-    define('TIMEZONE', $user->isLoggedIn() ? $user->data()->timezone : Util::getSetting('timezone', 'Europe/London'));
+    define('TIMEZONE', $user->isLoggedIn() ? $user->data()->timezone : Settings::get('timezone', 'Europe/London'));
     date_default_timezone_set(TIMEZONE);
 
     // Language
@@ -192,12 +211,14 @@ if ($page != 'install') {
 
     define('DEFAULT_LANGUAGE', $default_language);
 
-    if (!$user->isLoggedIn() || !($user->data()->language_id)) {
-        // Attempt to get the requested language from the browser if it exists
-        // and if the user has enabled auto language detection
-        $automatic_locale = Language::acceptFromHttp(HttpUtils::getHeader('Accept-Language') ?? '');
-        if ($automatic_locale !== false && (!Cookie::exists('auto_language') || Cookie::get('auto_language') === 'true')) {
-            $default_language = $automatic_locale;
+    if (!$user->isLoggedIn() || !$user->data()->language_id) {
+        if (Settings::get('auto_language_detection') && (!Cookie::exists('auto_language') || Cookie::get('auto_language') === 'true')) {
+            // Attempt to get the requested language from the browser if it exists
+            $automatic_locale = Language::acceptFromHttp(HttpUtils::getHeader('Accept-Language') ?? '');
+            if ($automatic_locale !== false) {
+                define('AUTO_LANGUAGE_VALUE', $automatic_locale[1]);
+                $default_language = $automatic_locale[0];
+            }
         }
 
         // Default language for guests
@@ -212,17 +233,21 @@ if ($page != 'install') {
             define('LANGUAGE', $language[0]->short_code);
         }
     }
-    $language = new Language('core', LANGUAGE);
+    $container->set(Language::class, function () {
+        return new Language('core', LANGUAGE);
+    });
+
+    $language = $container->get(Language::class);
 
     // Site name
-    $sitename = Util::getSetting('sitename');
+    $sitename = Settings::get('sitename');
     if ($sitename === null) {
         die('No sitename in settings table');
     }
     define('SITE_NAME', $sitename);
 
     // Template
-    if (!$user->isLoggedIn() || !($user->data()->theme_id)) {
+    if (!$user->isLoggedIn() || !$user->data()->theme_id) {
         // Default template for guests
         $cache->setCache('templatecache');
         $template = $cache->retrieve('default');
@@ -286,48 +311,6 @@ if ($page != 'install') {
         define('PANEL_TEMPLATE', $template);
     }
 
-    // Smarty
-    $securityPolicy = new Smarty_Security($smarty);
-    $securityPolicy->php_modifiers = [
-        'escape',
-        'count',
-        'key',
-        'round',
-        'ucfirst',
-        'defined',
-        'date',
-        'explode',
-        'implode',
-        'strtolower',
-        'strtoupper'
-    ];
-    $securityPolicy->php_functions = [
-        'isset',
-        'empty',
-        'count',
-        'sizeof',
-        'in_array',
-        'is_array',
-        'time',
-        'nl2br',
-        'is_numeric',
-        'file_exists',
-        'array_key_exists'
-    ];
-    $securityPolicy->secure_dir = [ROOT_PATH . '/custom/templates', ROOT_PATH . '/custom/panel_templates'];
-    $smarty->enableSecurity($securityPolicy);
-
-    // Basic Smarty variables
-    $smarty->assign([
-        'CONFIG_PATH' => defined('CONFIG_PATH') ? CONFIG_PATH . '/' : '/',
-        'OG_URL' => Output::getClean(rtrim(URL::getSelfURL(), '/') . $_SERVER['REQUEST_URI']),
-        'OG_IMAGE' => Output::getClean(rtrim(URL::getSelfURL(), '/') . '/core/assets/img/site_image.png'),
-        'SITE_NAME' => Output::getClean(SITE_NAME),
-        'SITE_HOME' => URL::build('/'),
-        'USER_INFO_URL' => URL::build('/queries/user/', 'id='),
-        'GUEST' => $language->get('user', 'guest')
-    ]);
-
     // Avatars
     $cache->setCache('avatar_settings_cache');
     if ($cache->isCached('custom_avatars') && $cache->retrieve('custom_avatars') == 1) {
@@ -357,9 +340,6 @@ if ($page != 'install') {
         define('DEFAULT_AVATAR_PERSPECTIVE', 'face');
     }
 
-    // Widgets
-    $widgets = new Widgets($cache, $language, $smarty);
-
     // Navbar links
     $navigation = new Navigation();
     $cc_nav = new Navigation();
@@ -370,11 +350,12 @@ if ($page != 'install') {
     $cc_nav->add('cc_alerts', $language->get('user', 'alerts'), URL::build('/user/alerts'));
     $cc_nav->add('cc_messaging', $language->get('user', 'messaging'), URL::build('/user/messaging'));
     $cc_nav->add('cc_connections', $language->get('user', 'connections'), URL::build('/user/connections'));
+    $cc_nav->add('cc_notification_settings', $language->get('user', 'notification_settings'), URL::build('/user/notification_settings'));
     $cc_nav->add('cc_settings', $language->get('user', 'profile_settings'), URL::build('/user/settings'));
-    $cc_nav->add('cc_oauth', $language->get('admin', 'oauth'), URL::build('/user/oauth'));
+    $cc_nav->add('cc_sessions', $language->get('general', 'sessions'), URL::build('/user/sessions'));
 
     // Placeholders enabled?
-    if (Util::getSetting('placeholders') === '1') {
+    if (Settings::get('placeholders') === '1') {
         $cc_nav->add('cc_placeholders', $language->get('user', 'placeholders'), URL::build('/user/placeholders'));
     }
 
@@ -398,17 +379,14 @@ if ($page != 'install') {
 
     $navigation->add('index', $language->get('general', 'home'), URL::build('/'), 'top', null, $home_order, $home_icon);
 
-    // Endpoints
-    $endpoints = new Endpoints();
-
-    // Announcements
-    $announcements = new Announcements($cache);
+    $endpoints = $container->get(Endpoints::class);
+    $announcements = $container->get(Announcements::class);
 
     // Modules
     $cache->setCache('modulescache');
     if (!$cache->isCached('enabled_modules')) {
         $cache->store('enabled_modules', [
-            ['name' => 'Core', 'priority' => 1]
+            ['name' => 'Core', 'priority' => 1],
         ]);
         $cache->store('module_core', true);
     }
@@ -424,44 +402,53 @@ if ($page != 'install') {
     if (!isset($core_exists)) {
         $enabled_modules[] = [
             'name' => 'Core',
-            'priority' => 1
+            'priority' => 1,
         ];
     }
 
-    $pages = new Pages();
+    $pages = $container->get(Pages::class);
 
     // Sort by priority
     usort($enabled_modules, static function ($a, $b) {
         return $a['priority'] - $b['priority'];
     });
 
+    // Load module dependencies
+    foreach ($enabled_modules as $module) {
+        if (file_exists(ROOT_PATH . '/modules/' . $module['name'] . '/autoload.php')) {
+            require_once ROOT_PATH . '/modules/' . $module['name'] . '/autoload.php';
+        }
+    }
+
+    // Load modules
     foreach ($enabled_modules as $module) {
         if (file_exists(ROOT_PATH . '/modules/' . $module['name'] . '/init.php')) {
-            require(ROOT_PATH . '/modules/' . $module['name'] . '/init.php');
+            require_once ROOT_PATH . '/modules/' . $module['name'] . '/init.php';
         }
     }
 
     // Maintenance mode?
-    if (Util::getSetting('maintenance') === '1') {
+    if (Settings::get('maintenance') === '1') {
         // Enabled
         // Admins only beyond this point
         if (!$user->isLoggedIn() || !$user->canViewStaffCP()) {
             // Maintenance mode
             if (isset($_GET['route']) && (
-                    rtrim($_GET['route'], '/') === '/login'
-                    || rtrim($_GET['route'], '/') === '/forgot_password'
-                    || str_contains($_GET['route'], '/api/')
-                    || str_contains($_GET['route'], 'queries')
-                    || str_contains($_GET['route'], 'oauth/')
-                )) {
+                rtrim($_GET['route'], '/') === '/login'
+                || rtrim($_GET['route'], '/') === '/forgot_password'
+                || str_contains($_GET['route'], '/api/')
+                || str_contains($_GET['route'], 'queries')
+                || str_contains($_GET['route'], 'oauth/')
+                || str_contains($_GET['route'], 'store/listener')
+            )) {
                 // Can continue as normal
             } else {
-                require(ROOT_PATH . '/maintenance.php');
-                die();
+                require(ROOT_PATH . '/core/includes/maintenance.php');
+                die;
             }
         } else {
             // Display notice to admin stating maintenance mode is enabled
-            $smarty->assign('MAINTENANCE_ENABLED', $language->get('admin', 'maintenance_enabled'));
+            define('BYPASS_MAINTENANCE', true);
         }
     }
 
@@ -490,7 +477,7 @@ if ($page != 'install') {
                         'action' => $hook->action == 1
                             ? [WebHook::class, 'execute']
                             : [DiscordHook::class, 'execute'],
-                        'events' => json_decode($hook->events, true)
+                        'events' => json_decode($hook->events, true),
                     ];
                 }
                 $cache->store('hooks', $hook_array);
@@ -501,6 +488,19 @@ if ($page != 'install') {
 
     // Get IP
     $ip = HttpUtils::getRemoteAddress();
+
+    // Define default group pre validation
+    $cache->setCache('pre_validation_default');
+    $group_id = null;
+
+    if ($cache->isCached('pre_validation_default')) {
+        $group_id = $cache->retrieve('pre_validation_default');
+    } else {
+        $group_id = DB::getInstance()->get('groups', ['default_group', '1'])->results();
+        $group_id = $group_id[0]->id;
+    }
+
+    define('PRE_VALIDATED_DEFAULT', $group_id);
 
     // Perform tasks if the user is logged in
     if ($user->isLoggedIn()) {
@@ -526,11 +526,11 @@ if ($page != 'install') {
         if (filter_var($ip, FILTER_VALIDATE_IP)) {
             $user->update([
                 'last_online' => date('U'),
-                'lastip' => $ip
+                'lastip' => $ip,
             ]);
         } else {
             $user->update([
-                'last_online' => date('U')
+                'last_online' => date('U'),
             ]);
         }
 
@@ -540,7 +540,7 @@ if ($page != 'install') {
             // Create the entry now
             DB::getInstance()->insert('users_ips', [
                 'user_id' => $user->data()->id,
-                'ip' => $ip
+                'ip' => $ip,
             ]);
         } else {
             if (count($user_ip_logged) > 1) {
@@ -557,7 +557,7 @@ if ($page != 'install') {
                     // Not yet logged, do so now
                     DB::getInstance()->insert('users_ips', [
                         'user_id' => $user->data()->id,
-                        'ip' => $ip
+                        'ip' => $ip,
                     ]);
                 }
             } else {
@@ -565,7 +565,7 @@ if ($page != 'install') {
                 if ($user_ip_logged[0]->user_id != $user->data()->id) {
                     DB::getInstance()->insert('users_ips', [
                         'user_id' => $user->data()->id,
-                        'ip' => $ip
+                        'ip' => $ip,
                     ]);
                 }
             }
@@ -593,28 +593,8 @@ if ($page != 'install') {
         foreach ($user->getIntegrations() as $integrationUser) {
             $user_integrations[$integrationUser->getIntegration()->getName()] = [
                 'username' => Output::getClean($integrationUser->data()->username),
-                'identifier' => Output::getClean($integrationUser->data()->identifier)
+                'identifier' => Output::getClean($integrationUser->data()->identifier),
             ];
-        }
-
-        // Basic user variables
-        $smarty->assign('LOGGED_IN_USER', [
-            'username' => $user->getDisplayname(true),
-            'nickname' => $user->getDisplayname(),
-            'profile' => $user->getProfileURL(),
-            'panel_profile' => URL::build('/panel/user/' . urlencode($user->data()->id) . '-' . urlencode($user->data()->username)),
-            'username_style' => $user->getGroupStyle(),
-            'user_title' => Output::getClean($user->data()->user_title),
-            'avatar' => $user->getAvatar(),
-            'integrations' => $user_integrations
-        ]);
-
-        // Panel access?
-        if ($user->canViewStaffCP()) {
-            $smarty->assign([
-                'PANEL_LINK' => URL::build('/panel'),
-                'PANEL' => $language->get('moderator', 'staff_cp')
-            ]);
         }
     } else {
         // Perform tasks for guests
@@ -630,6 +610,11 @@ if ($page != 'install') {
             }
 
             $_SESSION['checked'] = $date;
+        }
+
+        // Auto language enabled?
+        if (Settings::get('auto_language_detection')) {
+            define('AUTO_LANGUAGE', true);
         }
     }
 

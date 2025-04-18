@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Validates an array of data.
  * Often used for POST requests.
@@ -6,11 +7,11 @@
  * @package NamelessMC\Core
  * @author Samerton
  * @author Aberdeener
- * @version 2.0.0-pr13
+ * @version 2.2.0
  * @license MIT
  */
-class Validate {
-
+class Validate
+{
     /**
      * @var string Ensure this field is not empty
      */
@@ -35,6 +36,16 @@ class Validate {
      * @var string Check the user has agreed to the terms and conditions
      */
     public const AGREE = 'agree';
+
+    /**
+     * @var string Check the numeric value is at least x
+     */
+    public const AT_LEAST = 'at_least';
+
+    /**
+     * @var string Check the numeric value is at most x
+     */
+    public const AT_MOST = 'at_most';
 
     /**
      * @var string Check the value has not already been inputted in the database
@@ -72,6 +83,11 @@ class Validate {
     public const NUMERIC = 'numeric';
 
     /**
+     * @var string Check that the value is in of a set of values
+     */
+    public const IN = 'in';
+
+    /**
      * @var string Check that the value matches a regex pattern
      */
     public const REGEX = 'regex';
@@ -82,9 +98,19 @@ class Validate {
     public const NOT_START_WITH = 'not_start_with';
 
     /**
+     * @var string Check that the value does not contain a pattern
+     */
+    public const NOT_CONTAIN = 'not_contain';
+
+    /**
      * @var string Set a rate limit
      */
     public const RATE_LIMIT = 'rate_limit';
+
+    /**
+     * @var string Custom validation check
+     */
+    public const CUSTOM = 'custom';
 
     private DB $_db;
 
@@ -95,9 +121,10 @@ class Validate {
     private array $_errors = [];
 
     /**
-     * Create new `Validate` instance
+     * Create new `Validate` instance.
      */
-    private function __construct() {
+    private function __construct()
+    {
         // Connect to database for rules which need DB access
         try {
             $host = Config::get('mysql.host');
@@ -114,20 +141,19 @@ class Validate {
      * Validate an array of inputs.
      *
      * @param array $source inputs (eg: $_POST)
-     * @param array $items subset of inputs to be validated
+     * @param array $items  subset of inputs to be validated
      *
-     * @return Validate New instance of Validate.
      * @throws Exception If provided configuration for a rule is invalid - not if a provided value is invalid!
+     * @return Validate  New instance of Validate.
      */
-    public static function check(array $source, array $items = []): Validate {
+    public static function check(array $source, array $items = []): Validate
+    {
         $validator = new Validate();
 
         // Loop through the items which need validating
         foreach ($items as $item => $rules) {
-
             // Loop through each validation rule for the set item
             foreach ($rules as $rule => $rule_value) {
-
                 $value = trim($source[$item]);
 
                 // Escape the item's contents just in case
@@ -144,7 +170,7 @@ class Validate {
                         if (empty($source[$array][$matches[1]])) {
                             $missing = true;
                         }
-                    } else if (empty($value)) {
+                    } elseif (empty($value) && $value !== '0') {
                         $missing = true;
                     }
 
@@ -153,25 +179,24 @@ class Validate {
                         $validator->addError([
                             'field' => $item,
                             'rule' => self::REQUIRED,
-                            'fallback' => "$item is required."
+                            'fallback' => "$item is required.",
                         ]);
                         continue;
                     }
                 }
 
-                if (empty($value)) {
+                if (empty($value) && $value !== '0') {
                     continue;
                 }
 
                 // The post array does include this value, continue validating
                 switch ($rule) {
-
                     case self::MIN:
                         if (mb_strlen($value) < $rule_value) {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::MIN,
-                                'fallback' => "$item must be a minimum of $rule_value characters."
+                                'fallback' => "$item must be a minimum of $rule_value characters.",
                             ]);
                         }
                         break;
@@ -181,7 +206,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::MAX,
-                                'fallback' => "$item must be a maximum of $rule_value characters."
+                                'fallback' => "$item must be a maximum of $rule_value characters.",
                             ]);
                         }
                         break;
@@ -191,7 +216,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::MATCHES,
-                                'fallback' => "$rule_value must match $item."
+                                'fallback' => "$rule_value must match $item.",
                             ]);
                         }
                         break;
@@ -201,7 +226,29 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::AGREE,
-                                'fallback' => 'You must agree to our terms and conditions in order to register.'
+                                'fallback' => 'You must agree to our terms and conditions in order to register.',
+                            ]);
+                        }
+                        break;
+
+                    case self::AT_LEAST:
+                        if (floatval($value) < $rule_value) {
+                            $validator->addError([
+                                'field' => $item,
+                                'rule' => self::AT_LEAST,
+                                'fallback' => "$item must have a value of at least $rule_value.",
+                                'meta' => ['min' => $rule_value],
+                            ]);
+                        }
+                        break;
+
+                    case self::AT_MOST:
+                        if (floatval($value) > $rule_value) {
+                            $validator->addError([
+                                'field' => $item,
+                                'rule' => self::AT_MOST,
+                                'fallback' => "$item must have a value of at most $rule_value.",
+                                'meta' => ['max' => $rule_value],
                             ]);
                         }
                         break;
@@ -227,7 +274,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::UNIQUE,
-                                'fallback' => "The $rule_value.$item $value already exists!"
+                                'fallback' => "The $rule_value.$item $value already exists!",
                             ]);
                         }
                         break;
@@ -237,7 +284,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::EMAIL,
-                                'fallback' => "$value is not a valid email."
+                                'fallback' => "$value is not a valid email.",
                             ]);
                         }
                         break;
@@ -247,13 +294,13 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::TIMEZONE,
-                                'fallback' => "The timezone $value is invalid."
+                                'fallback' => "The timezone $value is invalid.",
                             ]);
                         }
                         break;
 
                     case self::IS_ACTIVE:
-                        $check = $validator->_db->get('users', [$item, $value]);
+                        $check = $validator->_db->query('SELECT * FROM nl2_users WHERE username = ? OR email = ?', [$value, $value]);
                         if (!$check->count()) {
                             break;
                         }
@@ -263,7 +310,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::IS_ACTIVE,
-                                'fallback' => "That $item is inactive. Have you validated your account or requested a password reset?"
+                                'fallback' => "That $item is inactive. Have you validated your account or requested a password reset?",
                             ]);
                         }
                         break;
@@ -279,7 +326,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::IS_BANNED,
-                                'fallback' => "The username $value is banned."
+                                'fallback' => "The username $value is banned.",
                             ]);
                         }
                         break;
@@ -289,7 +336,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::ALPHANUMERIC,
-                                'fallback' => "$item must be alphanumeric."
+                                'fallback' => "$item must be alphanumeric.",
                             ]);
                         }
                         break;
@@ -299,7 +346,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::NUMERIC,
-                                'fallback' => "$item must be numeric."
+                                'fallback' => "$item must be numeric.",
                             ]);
                         }
                         break;
@@ -309,7 +356,7 @@ class Validate {
                             $validator->addError([
                                 'field' => $item,
                                 'rule' => self::REGEX,
-                                'fallback' => "$item does not match the pattern $rule_value."
+                                'fallback' => "$item does not match the pattern $rule_value.",
                             ]);
                         }
                         break;
@@ -321,10 +368,40 @@ class Validate {
                                 $validator->addError([
                                     'field' => $item,
                                     'rule' => self::NOT_START_WITH,
-                                    'fallback' => "$item must not start with $denied_value."
+                                    'fallback' => "$item must not start with $denied_value.",
                                 ]);
+                                break;
                             }
-                            break;
+                        }
+                        break;
+
+                    case self::NOT_CONTAIN:
+                        if (!is_array($rule_value)) {
+                            $rule_value = [$rule_value];
+                        }
+
+                        foreach ($rule_value as $term) {
+                            if (strpos(strtolower($value), strtolower(trim($term))) !== false) {
+                                $validator->addError([
+                                    'field' => $item,
+                                    'rule' => self::NOT_CONTAIN,
+                                    'fallback' => "$item must not contain $term",
+                                ]);
+                                break;
+                            }
+                        }
+
+                        break;
+
+                    case self::IN:
+                        $values = is_string($rule_value) ? [$rule_value] : $rule_value;
+                        if (!in_array($value, $values)) {
+                            $string_values = implode(', ', $values);
+                            $validator->addError([
+                                'field' => $item,
+                                'rule' => self::IN,
+                                'fallback' => "$item must be one of $string_values.",
+                            ]);
                         }
                         break;
 
@@ -332,7 +409,7 @@ class Validate {
                         if (is_array($rule_value) && count($rule_value) === 2) {
                             // If array treat as [limit, seconds]
                             [$limit, $seconds] = $rule_value;
-                        } else if (is_int($rule_value)) {
+                        } elseif (is_int($rule_value)) {
                             // If integer default seconds to 60
                             [$limit, $seconds] = [$rule_value, 60];
                         }
@@ -372,6 +449,32 @@ class Validate {
                         }
 
                         break;
+
+                    case self::CUSTOM:
+                        if (!$rule_value instanceof Closure) {
+                            throw new Exception('Custom rule must be a instance of closure.');
+                        }
+
+                        $reflection = new ReflectionFunction($rule_value);
+                        $reflectionParams = $reflection->getParameters();
+                        if (count($reflectionParams) !== 2) {
+                            throw new InvalidArgumentException('Custom rule closure must take 2 arguments (Validate and the field item).');
+                        }
+
+                        // if they've provided a typehint for the first argument, make sure it's taking Validate
+                        $param = $reflectionParams[0];
+                        if ($param->getType() instanceof ReflectionNamedType && $param->getType()->getName() !== Validate::class) {
+                            throw new InvalidArgumentException('Custom rule closure must take Validate as the first argument.');
+                        }
+
+                        // check that the second argument is a string
+                        $param = $reflectionParams[1];
+                        if ($param->getType() instanceof ReflectionNamedType && $param->getType()->getName() !== 'string') {
+                            throw new InvalidArgumentException('Custom rule closure must take a string as the second argument.');
+                        }
+
+                        $rule_value($validator, $item);
+                        break;
                 }
             }
         }
@@ -390,8 +493,27 @@ class Validate {
      *
      * @param array $error message to add to error array
      */
-    private function addError(array $error): void {
+    private function addError(array $error): void
+    {
         $this->_to_convert[] = $error;
+    }
+
+    /**
+     * Add an array of information to generate an error message to the $_to_convert array.
+     * These errors will be translated in the `errors()` function later.
+     *
+     * @param string $item  field item
+     * @param string $error error message
+     * @param array  $meta  error metadata
+     */
+    public function addCustomError(string $item, string $error, array $meta = []): void
+    {
+        $this->_to_convert[] = [
+            'field' => $item,
+            'rule' => self::CUSTOM,
+            'fallback' => $error,
+            'meta' => $meta,
+        ];
     }
 
     /**
@@ -401,8 +523,10 @@ class Validate {
      *
      * @return Validate This instance of Validate.
      */
-    public function message(string $message): Validate {
+    public function message(string $message): Validate
+    {
         $this->_message = $message;
+
         return $this;
     }
 
@@ -413,8 +537,10 @@ class Validate {
      *
      * @return Validate This instance of Validate.
      */
-    public function messages(array $messages): Validate {
+    public function messages(array $messages): Validate
+    {
         $this->_messages = $messages;
+
         return $this;
     }
 
@@ -423,8 +549,8 @@ class Validate {
      *
      * @return array Any and all errors for this `Validate` instance.
      */
-    public function errors(): array {
-
+    public function errors(): array
+    {
         // If errors have already been translated, don't waste time redoing it
         if (!empty($this->_errors)) {
             return $this->_errors;
@@ -432,7 +558,6 @@ class Validate {
 
         // Loop all errors to convert and get their custom messages
         foreach ($this->_to_convert as $error) {
-
             $message = $this->getMessage($error['field'], $error['rule'], $error['fallback'], $error['meta']);
 
             // If there is no generic `message()` set or the translated message is not equal to generic message
@@ -458,17 +583,17 @@ class Validate {
      *  - Message for field, not rule specific
      *  - Result of callable if "*" rule exists
      *  - Generic message set with `message(...)`
-     *  - Fallback message for rule
+     *  - Fallback message for rule.
      *
-     * @param string $field name of field to search for.
-     * @param string $rule rule which check failed. should be from the constants defined above.
+     * @param string $field    name of field to search for.
+     * @param string $rule     rule which check failed. should be from the constants defined above.
      * @param string $fallback fallback default message if custom message and generic message are not supplied.
-     * @param ?array $meta optional meta to provide to message.
+     * @param ?array $meta     optional meta to provide to message.
      *
      * @return string Message for this field and rule.
      */
-    private function getMessage(string $field, string $rule, string $fallback, ?array $meta = []): string {
-
+    private function getMessage(string $field, string $rule, string $fallback, ?array $meta = []): string
+    {
         // No custom messages defined for this field
         if (!isset($this->_messages[$field])) {
             if (isset($this->_messages['*'])) {
@@ -505,8 +630,8 @@ class Validate {
      *
      * @return bool whether this 'Validate' passed or not.
      */
-    public function passed(): bool {
+    public function passed(): bool
+    {
         return $this->_passed;
     }
-
 }

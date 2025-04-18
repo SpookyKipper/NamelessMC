@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr9
+/**
+ * Staff panel social media page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel social media page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.core.social_media')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,7 +27,7 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'core_configuration';
 const PANEL_PAGE = 'social_media';
 $page_title = $language->get('admin', 'social_media');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 // Deal with input
 if (Input::exists()) {
@@ -27,10 +36,10 @@ if (Input::exists()) {
     if (Token::check()) {
         // Update database values
         // Youtube URL
-        Util::setSetting('youtube_url', Input::get('youtubeurl'));
+        Settings::set('youtube_url', Input::get('youtubeurl'));
 
         // Twitter URL
-        Util::setSetting('twitter_url', Input::get('twitterurl'));
+        Settings::set('twitter_url', Input::get('twitterurl'));
 
         // Twitter dark theme
         if (isset($_POST['twitter_dark_theme']) && $_POST['twitter_dark_theme'] == 1) {
@@ -39,10 +48,10 @@ if (Input::exists()) {
             $theme = 'light';
         }
 
-        Util::setSetting('twitter_style', $theme);
+        Settings::set('twitter_style', $theme);
 
         // Facebook URL
-        Util::setSetting('fb_url', Input::get('fburl'));
+        Settings::set('fb_url', Input::get('fburl'));
 
         Session::flash('social_success', $language->get('admin', 'social_media_settings_updated'));
         Redirect::to(URL::build('/panel/core/social_media'));
@@ -60,26 +69,26 @@ if (Session::exists('social_success')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
 // Get values from database
-$youtube_url = Util::getSetting('youtube_url');
-$twitter_url = Util::getSetting('twitter_url');
-$twitter_style = Util::getSetting('twitter_style');
-$fb_url = Util::getSetting('fb_url');
+$youtube_url = Settings::get('youtube_url');
+$twitter_url = Settings::get('twitter_url');
+$twitter_style = Settings::get('twitter_style');
+$fb_url = Settings::get('fb_url');
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'CONFIGURATION' => $language->get('admin', 'configuration'),
@@ -99,7 +108,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('core/social_media.tpl', $smarty);
+$template->displayTemplate('core/social_media');

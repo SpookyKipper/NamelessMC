@@ -1,16 +1,26 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr9
+/**
+ * Staff panel SEO page
  *
- *  License: MIT
+ * @author Partydragen
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel seo page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.core.seo')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,9 +28,9 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'core_configuration';
 const PANEL_PAGE = 'seo';
 $page_title = $language->get('admin', 'seo');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
-$timeago = new TimeAgo(TIMEZONE);
+$timeAgo = new TimeAgo(TIMEZONE);
 
 // Load modules + template
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
@@ -62,7 +72,11 @@ if (!isset($_GET['metadata'])) {
                 $success = $language->get('admin', 'sitemap_generated');
             } else {
                 if (Input::get('type') == 'google_analytics') {
-                    Util::setSetting('ga_script', Input::get('analyticsid'));
+                    Settings::set('ga_script', Input::get('analyticsid'));
+                    $success = $language->get('admin', 'seo_settings_updated_successfully');
+                } else if (Input::get('type') == 'meta') {
+                    Settings::set('default_meta_description', Input::get('default_description'));
+                    Settings::set('default_meta_keywords', Input::get('default_keywords'));
                     $success = $language->get('admin', 'seo_settings_updated_successfully');
                 }
             }
@@ -78,36 +92,47 @@ if (!isset($_GET['metadata'])) {
             $cache->setCache('sitemap_cache');
             if ($cache->isCached('updated')) {
                 $updated = $cache->retrieve('updated');
-                $updated = $timeago->inWords($updated, $language);
+                $updated = $timeAgo->inWords($updated, $language);
             } else {
                 $updated = $language->get('admin', 'unknown');
             }
 
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'SITEMAP_LAST_GENERATED' => $language->get('admin', 'sitemap_last_generated_x', [
                     'generatedAt' => Text::bold($updated)
                 ]),
                 'SITEMAP_LINK' => (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/cache/sitemaps/sitemap-index.xml',
                 'SITEMAP_FULL_LINK' => rtrim(URL::getSelfURL(), '/') . (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/cache/sitemaps/sitemap-index.xml',
                 'DOWNLOAD_SITEMAP' => $language->get('admin', 'download_sitemap'),
-                'LINK' => $language->get('admin', 'sitemap_link')
+                'LINK' => $language->get('admin', 'sitemap_link'),
             ]);
 
         } else {
-            $smarty->assign('SITEMAP_NOT_GENERATED', $language->get('admin', 'sitemap_not_generated_yet'));
+            $template->getEngine()->addVariable('SITEMAP_NOT_GENERATED', $language->get('admin', 'sitemap_not_generated_yet'));
         }
     }
 
-    $template_file = 'core/seo.tpl';
+    $template->getEngine()->addVariables([
+        'DEFAULT_DESCRIPTION' => $language->get('admin', 'default_description'),
+        'DEFAULT_DESCRIPTION_VALUE' => Settings::get('default_meta_description'),
+        'DEFAULT_KEYWORDS' => $language->get('admin', 'default_keywords'),
+        'DEFAULT_KEYWORDS_VALUE' => Settings::get('default_meta_keywords'),
+    ]);
+
+    $template_file = 'core/seo';
 } else {
     $page = $pages->getPageById($_GET['metadata']);
     if (is_null($page)) {
         Redirect::to(URL::build('/panel/core/seo'));
     }
 
+    $template->assets()->include(
+        AssetTree::IMAGE_PICKER,
+    );
+
     $page_metadata = DB::getInstance()->get('page_descriptions', ['page', $page['key']])->results();
     if (Input::exists()) {
-        if (Token::check(Input::get('token'))) {
+        if (Token::check()) {
             if (isset($_POST['description'])) {
                 if (strlen($_POST['description']) > 500) {
                     $errors[] = $language->get('admin', 'description_max_500');
@@ -120,20 +145,28 @@ if (!isset($_GET['metadata'])) {
 
             $keywords = $_POST['keywords'] ?? null;
 
+            if (Input::get('inputImage')) {
+                $image_url = ((defined('CONFIG_PATH')) ? CONFIG_PATH . '/' : '/') . 'uploads/og_images/' . Input::get('inputImage');
+            } else {
+                $image_url = '';
+            }
+
             if (!count($errors)) {
                 if (count($page_metadata)) {
                     $page_id = $page_metadata[0]->id;
 
                     DB::getInstance()->update('page_descriptions', $page_id, [
                         'description' => $description,
-                        'tags' => $keywords
+                        'tags' => $keywords,
+                        'image' => $image_url,
                     ]);
 
                 } else {
                     DB::getInstance()->insert('page_descriptions', [
                         'page' => $page['key'],
                         'description' => $description,
-                        'tags' => $keywords
+                        'tags' => $keywords,
+                        'image' => $image_url,
                     ]);
                 }
 
@@ -150,12 +183,32 @@ if (!isset($_GET['metadata'])) {
     if (count($page_metadata)) {
         $description = Output::getClean($page_metadata[0]->description);
         $tags = Output::getClean($page_metadata[0]->tags);
+        $og_image = Output::getClean($page_metadata[0]->image);
     } else {
         $description = '';
         $tags = '';
+        $og_image = '';
     }
 
-    $smarty->assign([
+    $image_path = implode(DIRECTORY_SEPARATOR, [ROOT_PATH, 'uploads', 'og_images']);
+    $images = scandir($image_path);
+    $og_images = [];
+    $n = 1;
+    foreach ($images as $image) {
+        $ext = pathinfo($image, PATHINFO_EXTENSION);
+        if (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+            continue;
+        }
+        $og_images[] = [
+            'src' => (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/uploads/og_images/' . $image,
+            'value' => $image,
+            'selected' => ($og_image === (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/uploads/og_images/' . $image),
+            'n' => $n
+        ];
+        $n++;
+    }
+
+    $template->getEngine()->addVariables([
         'BACK' => $language->get('general', 'back'),
         'BACK_LINK' => URL::build('/panel/core/seo'),
         'EDITING_PAGE' => $language->get('admin', 'editing_page_x', [
@@ -164,27 +217,29 @@ if (!isset($_GET['metadata'])) {
         'DESCRIPTION' => $language->get('admin', 'description'),
         'DESCRIPTION_VALUE' => $description,
         'KEYWORDS' => $language->get('admin', 'keywords'),
-        'KEYWORDS_VALUE' => $tags
+        'KEYWORDS_VALUE' => $tags,
+        'IMAGE' => $language->get('admin', 'image'),
+        'OG_IMAGES_ARRAY' => $og_images,
     ]);
 
-    $template_file = 'core/seo_metadata_edit.tpl';
+    $template_file = 'core/seo_metadata_edit';
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'CONFIGURATION' => $language->get('admin', 'configuration'),
@@ -192,7 +247,7 @@ $smarty->assign([
     'PAGE' => PANEL_PAGE,
     'TOKEN' => Token::get(),
     'GENERATE' => $language->get('admin', 'generate_sitemap'),
-    'GOOGLE_ANALYTICS_VALUE' => Util::getSetting('ga_script'),
+    'GOOGLE_ANALYTICS_VALUE' => Settings::get('ga_script'),
     'PAGE_TITLE' => $language->get('admin', 'page'),
     'PAGE_LIST' => $pages->returnPages(),
     'EDIT_LINK' => URL::build('/panel/core/seo/', 'metadata={x}'),
@@ -205,7 +260,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate($template_file, $smarty);
+$template->displayTemplate($template_file);

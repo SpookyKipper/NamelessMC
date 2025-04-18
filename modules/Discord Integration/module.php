@@ -1,4 +1,11 @@
 <?php
+/**
+ * NamelessMC Discord Module
+ *
+ * @author Aberdeener
+ * @version 2.2.0
+ * @license MIT
+ */
 
 class Discord_Module extends Module {
 
@@ -9,18 +16,18 @@ class Discord_Module extends Module {
 
         $name = 'Discord Integration';
         $author = '<a href="https://tadhg.sh" target="_blank" rel="nofollow noopener">Aberdeener</a>';
-        $module_version = '2.0.3';
-        $nameless_version = '2.0.3';
+        $module_version = '2.2.0';
+        $nameless_version = '2.2.0';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
-        $bot_url = Util::getSetting('discord_bot_url');
+        $bot_url = Settings::get('discord_bot_url');
         if ($bot_url === null) {
             $bot_url = '';
         }
         define('BOT_URL', $bot_url);
 
-        $bot_username = Util::getSetting('discord_bot_username');
+        $bot_username = Settings::get('discord_bot_username');
         if ($bot_username === null) {
             $bot_username = '';
         }
@@ -50,13 +57,13 @@ class Discord_Module extends Module {
     public function onEnable() {
     }
 
-    public function onPageLoad(User $user, Pages $pages, Cache $cache, Smarty $smarty, $navs, Widgets $widgets, ?TemplateBase $template) {
+    public function onPageLoad(User $user, Pages $pages, Cache $cache, $smarty, $navs, Widgets $widgets, TemplateBase $template) {
         PermissionHandler::registerPermissions($this->getName(), [
             'admincp.discord' => $this->_language->get('admin', 'integrations') . ' &raquo; ' . Discord::getLanguageTerm('discord'),
         ]);
 
-        if (defined('FRONT_END') || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
-            $widgets->add(new DiscordWidget($cache, $smarty));
+        if ($pages->getActivePage()['widgets'] || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
+            $widgets->add(new DiscordWidget($cache));
         }
 
         if (!defined('FRONT_END')) {

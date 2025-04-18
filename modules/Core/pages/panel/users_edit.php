@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr13
+/**
+ * Staff panel edit user page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel users page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.users.edit')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -29,7 +38,7 @@ const PARENT_PAGE = 'users';
 const PANEL_PAGE = 'users';
 const EDITING_USER = true;
 $page_title = $language->get('admin', 'users');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 // Load modules + template
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
@@ -41,7 +50,7 @@ if (isset($_GET['action'])) {
             if ($user_query->active == 0) {
                 $view_user->update([
                     'active' => true,
-                    'reset_code' => ''
+                    'reset_code' => null,
                 ]);
 
                 EventHandler::executeEvent(new UserValidatedEvent(
@@ -57,6 +66,17 @@ if (isset($_GET['action'])) {
             Session::flash('edit_user_success', $language->get('admin', 'email_resent_successfully'));
         } else {
             Session::flash('edit_user_error', $language->get('admin', 'email_resend_failed'));
+        }
+    } else if ($_GET['action'] == 'disable_tfa') {
+        if (Token::check()) {
+            $view_user->update([
+                'tfa_enabled' => false,
+                'tfa_type' => 0,
+                'tfa_secret' => null,
+                'tfa_complete' => false
+            ]);
+
+            Session::flash('edit_user_success', $language->get('admin', 'edit_user_tfa_disabled'));
         }
     } else {
         throw new InvalidArgumentException('Invalid action: ' . $_GET['action']);
@@ -106,7 +126,11 @@ if (Input::exists()) {
                     Validate::REQUIRED => true,
                     Validate::MIN => 3,
                     Validate::MAX => 20
-                ]
+                ],
+                'timezone' => [
+                    Validate::REQUIRED => true,
+                    Validate::TIMEZONE => true
+                ],
             ])->messages([
                 'email' => [
                     Validate::REQUIRED => $language->get('user', 'email_required'),
@@ -123,7 +147,8 @@ if (Input::exists()) {
                     Validate::REQUIRED => $language->get('user', 'username_required'),
                     Validate::MIN => $language->get('user', 'username_minimum_3'),
                     Validate::MAX => $language->get('user', 'username_maximum_20')
-                ]
+                ],
+                'timezone' => $language->get('general', 'invalid_timezone'),
             ]);
 
             // Does user have any groups selected
@@ -134,7 +159,7 @@ if (Input::exists()) {
 
             if ($validation->passed() && $passed) {
                 try {
-                    $private_profile_active = Util::getSetting('private_profile');
+                    $private_profile_active = Settings::get('private_profile');
                     $private_profile = 0;
 
                     if ($private_profile_active) {
@@ -142,17 +167,21 @@ if (Input::exists()) {
                     }
 
                     // Template
-                    $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
+                    if (Input::get('template') != 0) {
+                        $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
 
-                    if (count($new_template)) {
-                        $new_template = $new_template[0]->id;
+                        if (count($new_template)) {
+                            $new_template = $new_template[0]->id;
+                        } else {
+                            $new_template = $user_query->theme_id;
+                        }
                     } else {
-                        $new_template = $user_query->theme_id;
+                        $new_template = null;
                     }
 
                     // Nicknames?
                     $username = Input::get('username');
-                    if (Util::getSetting('displaynames') === '1') {
+                    if (Settings::get('displaynames') === '1') {
                         $nickname = Input::get('nickname');
                     } else {
                         $nickname = Input::get('username');
@@ -165,6 +194,8 @@ if (Input::exists()) {
                         'user_title' => Output::getClean(Input::get('title')),
                         'signature' => $signature,
                         'private_profile' => $private_profile,
+                        'language_id' => Output::getClean(Input::get('language')),
+                        'timezone' => Output::getClean(Input::get('timezone')),
                         'theme_id' => $new_template
                     ]);
 
@@ -260,62 +291,67 @@ if (Session::exists('edit_user_warnings')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
 if (isset($warnings) && count($warnings)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'WARNINGS' => $warnings,
-        'WARNINGS_TITLE' => $language->get('admin', 'warning')
+        'WARNINGS_TITLE' => $language->get('admin', 'warning'),
     ]);
 }
 
 if ($user_query->active == 0) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'VALIDATE_USER' => $language->get('admin', 'validate_user'),
         'VALIDATE_USER_LINK' => URL::build('/panel/users/edit/', 'id=' . urlencode($user_query->id) . '&action=validate'),
         'RESEND_ACTIVATION_EMAIL' => $language->get('admin', 'resend_activation_email'),
-        'RESEND_ACTIVATION_EMAIL_LINK' => URL::build('/panel/users/edit/', 'id=' . urlencode($user_query->id) . '&action=resend_email')
+        'RESEND_ACTIVATION_EMAIL_LINK' => URL::build('/panel/users/edit/', 'id=' . urlencode($user_query->id) . '&action=resend_email'),
     ]);
 }
 
 if ($user_query->id != 1 && !$view_user->canViewStaffCP()) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'DELETE_USER' => $language->get('admin', 'delete_user'),
         'ARE_YOU_SURE' => $language->get('general', 'are_you_sure'),
         'CONFIRM_DELETE_USER' => $language->get('admin', 'confirm_user_deletion', ['user' => Output::getClean($user_query->username)]),
         'YES' => $language->get('general', 'yes'),
         'NO' => $language->get('general', 'no'),
-
         'NEW_PASSWORD' => $language->get('user', 'new_password'),
         'CONFIRM_NEW_PASSWORD' => $language->get('user', 'confirm_new_password'),
         'CHANGE_PASSWORD' => $language->get('user', 'change_password'),
+
+        'DISABLE_TFA' => $language->get('admin', 'disable_tfa'),
+        'DISABLE_TFA_LINK' => URL::build('/panel/users/edit/', 'id=' . urlencode($user_query->id) . '&action=disable_tfa')
     ]);
 }
 
 $limit_groups = false;
 if ($user_query->id == 1 || ($user_query->id == $user->data()->id && !$user->hasPermission('admincp.groups.self'))) {
-    $smarty->assign([
-        'CANT_EDIT_GROUP' => $language->get('admin', 'cant_modify_root_user')
-    ]);
+    $template->getEngine()->addVariable('CANT_EDIT_GROUP', $language->get('admin', 'cant_modify_root_user'));
     $limit_groups = true;
 }
 
-$private_profile = Util::getSetting('private_profile');
+$private_profile = Settings::get('private_profile');
 
 $templates = [];
-$templates_query = DB::getInstance()->get('templates', ['id', '<>', 0])->results();
+$templates_query = DB::getInstance()->get('templates', ['enabled', 1])->results();
 
+$templates[] = [
+    'id' => 0,
+    'name' => $language->get('general', 'default'),
+    'active' => $user_query->theme_id === null
+];
 foreach ($templates_query as $item) {
     $templates[] = [
         'id' => Output::getClean($item->id),
@@ -342,7 +378,18 @@ $signature = Output::getPurified($user_query->signature);
 
 $user_groups = $view_user->getAllGroupIds();
 
-$smarty->assign([
+// Get languages
+$languages = [];
+$language_query = DB::getInstance()->get('languages', ['id', '<>', 0])->results();
+foreach ($language_query as $item) {
+    $languages[] = [
+        'id' => $item->id,
+        'name' => Output::getClean($item->name),
+        'active' => $user->data()->language_id == $item->id
+    ];
+}
+
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'USER_MANAGEMENT' => $language->get('admin', 'user_management'),
@@ -357,7 +404,7 @@ $smarty->assign([
     'BACK' => $language->get('general', 'back'),
     'ACTIONS' => $language->get('general', 'actions'),
     'USER_ID' => Output::getClean($user_query->id),
-    'DISPLAYNAMES' => Util::getSetting('displaynames') === '1',
+    'DISPLAYNAMES' => Settings::get('displaynames') === '1',
     'USERNAME' => $language->get('user', 'username'),
     'USERNAME_VALUE' => Output::getClean($user_query->username),
     'NICKNAME' => $language->get('user', 'nickname'),
@@ -366,6 +413,12 @@ $smarty->assign([
     'EMAIL_ADDRESS_VALUE' => Output::getClean($user_query->email),
     'USER_TITLE' => $language->get('admin', 'title'),
     'USER_TITLE_VALUE' => Output::getClean($user_query->user_title),
+    'LANGUAGE' => $language->get('user', 'active_language'),
+    'LANGUAGE_VALUE' => $user_query->language_id,
+    'LANGUAGES' => $languages,
+    'TIMEZONE' => $language->get('user', 'timezone'),
+    'TIMEZONE_VALUE' => $user_query->timezone,
+    'TIMEZONES' => Util::listTimezones(),
     'PRIVATE_PROFILE' => $language->get('user', 'private_profile'),
     'PRIVATE_PROFILE_VALUE' => $user_query->private_profile,
     'PRIVATE_PROFILE_ENABLED' => ($private_profile == 1),
@@ -393,7 +446,7 @@ $template->addJSScript(Input::createTinyEditor($language, 'InputSignature', null
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('core/users_edit.tpl', $smarty);
+$template->displayTemplate('core/users_edit');

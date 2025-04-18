@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr10
+/**
+ * Staff panel images page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel images page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.styles.images')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,11 +27,11 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'layout';
 const PANEL_PAGE = 'images';
 $page_title = $language->get('admin', 'images');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 // Reset background
 if (isset($_GET['action'])) {
-    if ($_GET['action'] == 'reset_banner') {
+    if ($_GET['action'] === 'reset_banner') {
         $cache->setCache('backgroundcache');
         $cache->store('banner_image', '');
 
@@ -30,7 +39,7 @@ if (isset($_GET['action'])) {
         Redirect::to(URL::build('/panel/core/images'));
     }
 
-    if ($_GET['action'] == 'reset_logo') {
+    if ($_GET['action'] === 'reset_logo') {
         $cache->setCache('backgroundcache');
         $cache->store('logo_image', '');
 
@@ -38,11 +47,19 @@ if (isset($_GET['action'])) {
         Redirect::to(URL::build('/panel/core/images'));
     }
 
-    if ($_GET['action'] == 'reset_favicon') {
+    if ($_GET['action'] === 'reset_favicon') {
         $cache->setCache('backgroundcache');
         $cache->store('favicon_image', '');
 
         Session::flash('panel_images_success', $language->get('admin', 'favicon_reset_successfully'));
+        Redirect::to(URL::build('/panel/core/images'));
+    }
+
+    if ($_GET['action'] === 'reset_og_image') {
+        $cache->setCache('backgroundcache');
+        $cache->store('og_image', '');
+
+        Session::flash('panel_images_success', $language->get('admin', 'og_image_reset_successfully'));
         Redirect::to(URL::build('/panel/core/images'));
     }
 }
@@ -65,13 +82,14 @@ if (Input::exists()) {
 
                 Session::flash('panel_images_success', $language->get('admin', 'logo_updated_successfully'));
 
-            } else {
-                if (isset($_POST['favicon'])) {
-                    $cache->store('favicon_image', ((defined('CONFIG_PATH')) ? CONFIG_PATH . '/' : '/') . 'uploads/favicons/' . Input::get('favicon'));
+            } else if (isset($_POST['favicon'])) {
+                $cache->store('favicon_image', ((defined('CONFIG_PATH')) ? CONFIG_PATH . '/' : '/') . 'uploads/favicons/' . Input::get('favicon'));
 
-                    Session::flash('panel_images_success', $language->get('admin', 'favicon_updated_successfully'));
+                Session::flash('panel_images_success', $language->get('admin', 'favicon_updated_successfully'));
+            } else if (isset($_POST['og_image'])) {
+                $cache->store('og_image', ((defined('CONFIG_PATH')) ? CONFIG_PATH . '/' : '/') . 'uploads/og_images/' . Input::get('og_image'));
 
-                }
+                Session::flash('panel_images_success', $language->get('admin', 'og_image_updated_successfully'));
             }
         }
 
@@ -91,16 +109,14 @@ if (Session::exists('panel_images_success')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
-        'ERRORS' => $errors
-    ]);
+    $template->getEngine()->addVariable('ERRORS', $errors);
 }
 
 // Get banner from cache
@@ -134,6 +150,15 @@ if ($favicon_image == '') {
     $favicon_img = $language->get('general', 'none');
 } else {
     $favicon_img = Output::getClean($favicon_image);
+}
+
+// Get OG image from cache
+$og_image = $cache->retrieve('og_image');
+
+if ($og_image == '') {
+    $og_img = $language->get('general', 'none');
+} else {
+    $og_img = Output::getClean($og_image);
 }
 
 // Only display jpeg, png, jpg, gif
@@ -199,31 +224,57 @@ foreach ($images as $image) {
     $n++;
 }
 
+$image_path = implode(DIRECTORY_SEPARATOR, [ROOT_PATH, 'uploads', 'og_images']);
+$images = scandir($image_path);
+$og_images = [];
+
+$n = 1;
+
+foreach ($images as $image) {
+    $ext = pathinfo($image, PATHINFO_EXTENSION);
+    if (!in_array($ext, $allowed_exts)) {
+        continue;
+    }
+    $og_images[] = [
+        'src' => (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/uploads/og_images/' . $image,
+        'value' => $image,
+        'selected' => ($og_image == (defined('CONFIG_PATH') ? CONFIG_PATH : '') . '/uploads/og_images/' . $image),
+        'n' => $n
+    ];
+    $n++;
+}
+
 if (!is_writable(ROOT_PATH . '/uploads/backgrounds')) {
-    $smarty->assign('BACKGROUNDS_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
+    $template->getEngine()->addVariable('BACKGROUNDS_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
         'directory' => Text::bold('uploads/backgrounds')
     ]));
 }
 
 if (!is_writable(ROOT_PATH . '/uploads/template_banners')) {
-    $smarty->assign('TEMPLATE_BANNERS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
+    $template->getEngine()->addVariable('TEMPLATE_BANNERS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
         'directory' => Text::bold('uploads/template_banners')
     ]));
 }
 
 if (!is_writable(ROOT_PATH . '/uploads/logos')) {
-    $smarty->assign('LOGOS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
+    $template->getEngine()->addVariable('LOGOS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
         'directory' => Text::bold('uploads/logos')
     ]));
 }
 
 if (!is_writable(ROOT_PATH . '/uploads/favicons')) {
-    $smarty->assign('FAVICONS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
+    $template->getEngine()->addVariable('FAVICONS_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
         'directory' => Text::bold('uploads/favicons')
     ]));
 }
 
-$smarty->assign([
+if (!is_writable(ROOT_PATH . '/uploads/og_images')) {
+    $template->getEngine()->addVariable('OG_IMAGES_DIRECTORY_NOT_WRITABLE', $language->get('admin', 'x_directory_not_writable', [
+        'directory' => Text::bold('uploads/og_images')
+    ]));
+}
+
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'LAYOUT' => $language->get('admin', 'layout'),
@@ -242,6 +293,8 @@ $smarty->assign([
     'RESET_LOGO_LINK' => URL::build('/panel/core/images/', 'action=reset_logo'),
     'RESET_FAVICON' => $language->get('admin', 'reset_favicon'),
     'RESET_FAVICON_LINK' => URL::build('/panel/core/images/', 'action=reset_favicon'),
+    'RESET_OG_IMAGE' => $language->get('admin', 'reset_og_image'),
+    'RESET_OG_IMAGE_LINK' => URL::build('/panel/core/images/', 'action=reset_og_image'),
     'BANNER_IMAGES_ARRAY' => $template_banner_images,
     'BANNER_IMAGE' => $language->get('admin', 'banner_image_x', [
         'imageName' => Text::bold($banner_img)
@@ -254,13 +307,17 @@ $smarty->assign([
     'FAVICON_IMAGE' => $language->get('admin', 'favicon_image_x', [
         'imageName' => Text::bold($favicon_img)
     ]),
+    'OG_IMAGES_ARRAY' => $og_images,
+    'FALLBACK_OG_IMAGE' => $language->get('admin', 'fallback_og_image_x', [
+        'imageName' => Text::bold($og_img)
+    ]),
     'ERRORS_TITLE' => $language->get('general', 'error'),
     'INFO' => $language->get('general', 'info'),
 ]);
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('core/images.tpl', $smarty);
+$template->displayTemplate('core/images');

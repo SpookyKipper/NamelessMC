@@ -1,12 +1,10 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0
+/**
+ * NamelessMC Core Module
  *
- *  License: MIT
- *
- *  Core module file
+ * @author Samerton
+ * @version 2.2.0
+ * @license MIT
  */
 
 class Core_Module extends Module {
@@ -21,13 +19,13 @@ class Core_Module extends Module {
 
         $name = 'Core';
         $author = '<a href="https://samerton.me" target="_blank" rel="nofollow noopener">Samerton</a>';
-        $module_version = '2.0.3';
-        $nameless_version = '2.0.3';
+        $module_version = '2.2.0';
+        $nameless_version = '2.2.0';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
         // Define URLs which belong to this module
-        $pages->add('Core', '/', 'pages/index.php');
+        $pages->add('Core', '/', 'pages/index.php', '', true);
         $pages->add('Core', '/api/v2', 'pages/api/v2/index.php');
         $pages->add('Core', '/home', 'pages/home.php', 'index', true);
 
@@ -42,6 +40,8 @@ class Core_Module extends Module {
         $pages->add('Core', '/queries/mention_users', 'queries/mention_users.php');
         $pages->add('Core', '/queries/alerts', 'queries/alerts.php');
         $pages->add('Core', '/queries/dark_light_mode', 'queries/dark_light_mode.php');
+        $pages->add('Core', '/queries/queue', 'queries/queue.php');
+        $pages->add('Core', '/queries/queue_status', 'queries/queue_status.php');
         $pages->add('Core', '/queries/pms', 'queries/pms.php');
         $pages->add('Core', '/queries/servers', 'queries/servers.php');
         $pages->add('Core', '/queries/server', 'queries/server.php');
@@ -49,25 +49,27 @@ class Core_Module extends Module {
         $pages->add('Core', '/queries/users', 'queries/users.php');
         $pages->add('Core', '/queries/debug_link', 'queries/debug_link.php');
         $pages->add('Core', '/queries/tinymce_image_upload', 'queries/tinymce_image_upload.php');
+        $pages->add('Core', '/queries/reactions', 'queries/reactions.php');
         $pages->add('Core', '/banner', 'pages/minecraft/banner.php');
         $pages->add('Core', '/terms', 'pages/terms.php');
         $pages->add('Core', '/privacy', 'pages/privacy.php');
         $pages->add('Core', '/forgot_password', 'pages/forgot_password.php');
         $pages->add('Core', '/complete_signup', 'pages/complete_signup.php');
         $pages->add('Core', '/status', 'pages/status.php', 'status');
-        if (Util::getSetting('mc_integration')) {
+        if (Settings::get('mc_integration')) {
             $pages->add('Core', '/leaderboards', 'pages/leaderboards.php', 'leaderboards');
         }
         $pages->add('Core', '/oauth', 'pages/oauth.php');
 
-        $pages->add('Core', '/user', 'pages/user/index.php');
-        $pages->add('Core', '/user/settings', 'pages/user/settings.php');
-        $pages->add('Core', '/user/messaging', 'pages/user/messaging.php');
-        $pages->add('Core', '/user/alerts', 'pages/user/alerts.php');
-        $pages->add('Core', '/user/oauth', 'pages/user/oauth.php');
-        $pages->add('Core', '/user/placeholders', 'pages/user/placeholders.php');
+        $pages->add('Core', '/user', 'pages/user/index.php', 'cc_overview');
+        $pages->add('Core', '/user/settings', 'pages/user/settings.php', 'cc_settings');
+        $pages->add('Core', '/user/messaging', 'pages/user/messaging.php', 'cc_messaging');
+        $pages->add('Core', '/user/alerts', 'pages/user/alerts.php', 'cc_alerts');
+        $pages->add('Core', '/user/sessions', 'pages/user/sessions.php', 'cc_sessions');
+        $pages->add('Core', '/user/notification_settings', 'pages/user/notification_settings.php', 'cc_notification_settings');
+        $pages->add('Core', '/user/placeholders', 'pages/user/placeholders.php', 'cc_placeholders');
         $pages->add('Core', '/user/acknowledge', 'pages/user/acknowledge.php');
-        $pages->add('Core', '/user/connections', 'pages/user/connections.php');
+        $pages->add('Core', '/user/connections', 'pages/user/connections.php', 'cc_connections');
 
         // Panel
         $pages->add('Core', '/panel', 'pages/panel/index.php');
@@ -81,7 +83,7 @@ class Core_Module extends Module {
         $pages->add('Core', '/panel/core/errors', 'pages/panel/errors.php');
         $pages->add('Core', '/panel/core/emails', 'pages/panel/emails.php');
         $pages->add('Core', '/panel/core/emails/errors', 'pages/panel/emails_errors.php');
-        $pages->add('Core', '/panel/core/emails/mass_message', 'pages/panel/emails_mass_message.php');
+        $pages->add('Core', '/panel/core/mass_message', 'pages/panel/mass_message.php');
         $pages->add('Core', '/panel/core/navigation', 'pages/panel/navigation.php');
         $pages->add('Core', '/panel/core/privacy_and_terms', 'pages/panel/privacy_and_terms.php');
         $pages->add('Core', '/panel/core/reactions', 'pages/panel/reactions.php');
@@ -95,6 +97,7 @@ class Core_Module extends Module {
         $pages->add('Core', '/panel/core/widgets', 'pages/panel/widgets.php');
         $pages->add('Core', '/panel/core/modules', 'pages/panel/modules.php');
         $pages->add('Core', '/panel/core/pages', 'pages/panel/pages.php');
+        $pages->add('Core', '/panel/core/queue', 'pages/panel/queue.php');
         $pages->add('Core', '/panel/core/hooks', 'pages/panel/hooks.php');
         $pages->add('Core', '/panel/core/integrations', 'pages/panel/integrations.php');
         $pages->add('Core', '/panel/minecraft/placeholders', 'pages/panel/placeholders.php');
@@ -109,14 +112,18 @@ class Core_Module extends Module {
         $pages->add('Core', '/panel/users', 'pages/panel/users.php');
         $pages->add('Core', '/panel/users/edit', 'pages/panel/users_edit.php');
         $pages->add('Core', '/panel/users/integrations', 'pages/panel/users_integrations.php');
-        $pages->add('Core', '/panel/users/oauth', 'pages/panel/users_oauth.php');
         $pages->add('Core', '/panel/users/ip_lookup', 'pages/panel/users_ip_lookup.php');
         $pages->add('Core', '/panel/users/punishments', 'pages/panel/users_punishments.php');
         $pages->add('Core', '/panel/users/reports', 'pages/panel/users_reports.php');
+        $pages->add('Core', '/panel/users/sessions', 'pages/panel/users_sessions.php');
         $pages->add('Core', '/panel/user', 'pages/panel/user.php');
 
         // Ajax GET requests
         $pages->addAjaxScript(URL::build('/queries/servers'));
+
+        if (Settings::get('queue_runner', 'ajax') == 'ajax') {
+            $pages->addAjaxScript(URL::build('/queries/queue'));
+        }
 
         // "More" dropdown
         $cache->setCache('navbar_icons');
@@ -297,6 +304,7 @@ class Core_Module extends Module {
 
         // -- Events
         EventHandler::registerEvent(AnnouncementCreatedEvent::class);
+        EventHandler::registerEvent(GenerateNotificationContentEvent::class);
         EventHandler::registerEvent(GroupClonedEvent::class);
         EventHandler::registerEvent(ReportCreatedEvent::class);
         EventHandler::registerEvent(UserBannedEvent::class);
@@ -370,11 +378,24 @@ class Core_Module extends Module {
             true
         );
 
+        EventHandler::registerEvent('renderProfilePost',
+            $language->get('admin', 'render_profile_post_hook_info'),
+            [
+                'content' => $language->get('general', 'content')
+            ],
+            true,
+            true
+        );
+
         NamelessOAuth::getInstance()->registerProvider('discord', 'Core', [
             'class' => \Wohali\OAuth2\Client\Provider\Discord::class,
             'user_id_name' => 'id',
             'scope_id_name' => 'identify',
             'icon' => 'fab fa-discord',
+            'button_css' => [
+                'background-color' => '#5865F2',
+                'color' => '#FFFFFF',
+            ],
             'verify_email' => static fn () => true,
         ]);
 
@@ -382,14 +403,32 @@ class Core_Module extends Module {
             'class' => \League\OAuth2\Client\Provider\Google::class,
             'user_id_name' => 'sub',
             'scope_id_name' => 'openid',
-            'icon' => 'fab fa-google',
+            'logo_url' => rtrim(URL::getSelfURL(), '/') . '/core/assets/img/google_logo.png',
+            // Google has strict restrictions (https://developers.google.com/identity/branding-guidelines) on how
+            // their logo should be formatted for login buttons, and should not be altered by any template
+            'logo_css' => [
+                'width' => '18px',
+                'height' => '18px',
+                'vertical-align' => 'middle',
+                'margin-bottom' => '-2px',
+                'margin-top' => '-2px',
+            ],
+            'button_css' => [
+                'background-color' => '#FFFFFF',
+                'color' => '#757575',
+                'line-height' => '.05em',
+                'box-shadow' => 'inset 0px 0px 0px 1px #DFDFDF;'
+            ],
+            'text_css' => [
+                'vertical-align' => 'middle',
+            ],
             'verify_email' => static fn () => true,
         ]);
 
         // Captcha
-        $captchaPublicKey = Util::getSetting('recaptcha_key', '');
-        $captchaPrivateKey = Util::getSetting('recaptcha_secret', '');
-        $activeCaptcha = Util::getSetting('recaptcha_type', 'Recaptcha3');
+        $captchaPublicKey = Settings::get('recaptcha_key', '');
+        $captchaPrivateKey = Settings::get('recaptcha_secret', '');
+        $activeCaptcha = Settings::get('recaptcha_type', 'Recaptcha3');
 
         CaptchaBase::addProvider(new hCaptcha($captchaPrivateKey, $captchaPublicKey));
         CaptchaBase::addProvider(new Recaptcha2($captchaPrivateKey, $captchaPublicKey));
@@ -467,51 +506,70 @@ class Core_Module extends Module {
         });
 
         // Minecraft Integration
-        if (Util::getSetting('mc_integration')) {
+        if (Settings::get('mc_integration')) {
             Integrations::getInstance()->registerIntegration(new MinecraftIntegration($language));
         }
 
+        Integrations::getInstance()->registerIntegration(new GoogleIntegration($language));
+
         EventHandler::registerListener(GroupClonedEvent::class, CloneGroupHook::class);
+
+        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'ContentHook::purify');
+        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'ContentHook::renderEmojis', 10);
+        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'MentionsHook::parsePost', 5);
 
         // TODO: Use [class, 'method'] callable syntax
         EventHandler::registerListener('renderPrivateMessage', 'ContentHook::purify');
-        EventHandler::registerListener('renderPrivateMessage', 'ContentHook::codeTransform', 15);
-        EventHandler::registerListener('renderPrivateMessage', 'ContentHook::decode', 20);
         EventHandler::registerListener('renderPrivateMessage', 'ContentHook::renderEmojis', 10);
         EventHandler::registerListener('renderPrivateMessage', 'ContentHook::replaceAnchors', 15);
 
         EventHandler::registerListener('renderPrivateMessageEdit', 'ContentHook::purify');
-        EventHandler::registerListener('renderPrivateMessageEdit', 'ContentHook::codeTransform', 15);
-        EventHandler::registerListener('renderPrivateMessageEdit', 'ContentHook::decode', 20);
         EventHandler::registerListener('renderPrivateMessageEdit', 'ContentHook::replaceAnchors', 15);
 
         EventHandler::registerListener('preCustomPageCreate', 'MentionsHook::preCreate');
         EventHandler::registerListener('preCustomPageEdit', 'MentionsHook::preEdit');
 
         EventHandler::registerListener('renderCustomPage', 'ContentHook::purify');
-        EventHandler::registerListener('renderCustomPage', 'ContentHook::codeTransform', 15);
-        EventHandler::registerListener('renderCustomPage', 'ContentHook::decode', 20);
         EventHandler::registerListener('renderCustomPage', 'ContentHook::renderEmojis', 10);
         EventHandler::registerListener('renderCustomPage', 'ContentHook::replaceAnchors', 15);
         EventHandler::registerListener('renderCustomPage', 'MentionsHook::parsePost', 5);
 
-        EventHandler::registerListener('renderCustomPageEdit', 'ContentHook::codeTransform', 15);
-        EventHandler::registerListener('renderCustomPageEdit', 'ContentHook::decode', 20);
         EventHandler::registerListener('renderCustomPageEdit', 'ContentHook::replaceAnchors', 15);
+
+        // TODO: ContentHook::decode is deprecated - do we need to decode profile posts saved in the DB using the queue??
+        EventHandler::registerListener('renderProfilePost', [ContentHook::class, 'decode'], 20);
+        EventHandler::registerListener('renderProfilePost', [ContentHook::class, 'purify']);
+        EventHandler::registerListener('renderProfilePost', [ContentHook::class, 'renderEmojis']);
+        EventHandler::registerListener('renderProfilePost', [ContentHook::class, 'replaceAnchors'], 5);
+        EventHandler::registerListener('renderProfilePost', [MentionsHook::class, 'parsePost'], 5);
+
+        EventHandler::registerListener(UserRegisteredEvent::class, DefaultUserNotificationPreferencesHook::class);
 
         Email::addPlaceholder('[Sitename]', Output::getClean(SITE_NAME));
         Email::addPlaceholder('[Greeting]', static fn(Language $viewing_language) => $viewing_language->get('emails', 'greeting'));
         Email::addPlaceholder('[Message]', static fn(Language $viewing_language, string $email) => $viewing_language->get('emails', $email . '_message'));
         Email::addPlaceholder('[Thanks]', static fn(Language $viewing_language) => $viewing_language->get('emails', 'thanks'));
 
-        MemberListManager::getInstance()->registerListProvider(new RegisteredMembersListProvider($language));
-        MemberListManager::getInstance()->registerListProvider(new StaffMembersListProvider($language));
+        if (Util::isModuleEnabled('Members')) {
+            MemberListManager::getInstance()->registerListProvider(new RegisteredMembersListProvider($language));
+            MemberListManager::getInstance()->registerListProvider(new StaffMembersListProvider($language));
 
-        MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($language) {
-            return [
-                $language->get('general', 'joined') => date(DATE_FORMAT, $member->data()->joined),
-            ];
-        });
+            MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($language) {
+                return [
+                    $language->get('general', 'joined') => date(DATE_FORMAT, $member->data()->joined),
+                ];
+            });
+        }
+
+        ReactionContextsManager::getInstance()->provideContext(new ProfilePostReactionContext());
+
+        // Notifications
+        Notification::addType(
+            'mass_message',
+            $language->get('notification', 'mass_message'),
+            Module::getIdFromName('Core'),
+            ['alert' => true, 'email' => true],
+        );
     }
 
     public static function getDashboardGraphs(): array {
@@ -548,7 +606,15 @@ class Core_Module extends Module {
         // Not necessary for Core
     }
 
-    public function onPageLoad(User $user, Pages $pages, Cache $cache, Smarty $smarty, $navs, Widgets $widgets, ?TemplateBase $template) {
+    public function onPageLoad(
+        User $user,
+        Pages $pages,
+        Cache $cache,
+        $smarty,
+        iterable $navs,
+        Widgets $widgets,
+        TemplateBase $template
+    ) {
         $language = $this->_language;
 
         // Permissions
@@ -567,8 +633,9 @@ class Core_Module extends Module {
             'admincp.core.debugging' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'debugging_and_maintenance'),
             'admincp.errors' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'debugging_and_maintenance') . ' &raquo; ' . $language->get('admin', 'error_logs'),
             'admincp.core.emails' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'emails'),
-            'admincp.core.emails_mass_message' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'emails_mass_message'),
+            'admincp.core.emails_mass_message' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'mass_message'),
             'admincp.core.navigation' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'navigation'),
+            'admincp.core.queue' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'queue'),
             'admincp.core.reactions' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('user', 'reactions'),
             'admincp.core.registration' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'registration'),
             'admincp.core.social_media' => $language->get('admin', 'core') . ' &raquo; ' . $language->get('admin', 'social_media'),
@@ -608,6 +675,7 @@ class Core_Module extends Module {
             'modcp.reports' => $language->get('admin', 'user_management') . ' &raquo; ' . $language->get('moderator', 'reports'),
             'modcp.profile_banner_reset' => $language->get('admin', 'user_management') . ' &raquo; ' . $language->get('moderator', 'reset_profile_banner'),
             'admincp.users.edit' => $language->get('admin', 'user_management') . ' &raquo; ' . $language->get('admin', 'users') . ' &raquo; ' . $language->get('general', 'edit'),
+            'admincp.users.sessions' => $language->get('admin', 'user_management') . ' &raquo; ' . $language->get('admin', 'users') . ' &raquo; '  . $language->get('general', 'sessions'),
             'admincp.groups' => $language->get('admin', 'groups'),
             'admincp.groups.self' => $language->get('admin', 'groups') . ' &raquo; ' . $language->get('admin', 'can_edit_own_group'),
             'admincp.widgets' => $language->get('admin', 'widgets'),
@@ -625,68 +693,62 @@ class Core_Module extends Module {
 
         // Profile Page
         PermissionHandler::registerPermissions('Profile', [
-            'profile.private.bypass' => $language->get('general', 'bypass') . ' &raquo; ' . $language->get('user', 'private_profile')
+            'profile.private.bypass' => $language->get('general', 'bypass') . ' &raquo; ' . $language->get('user', 'private_profile'),
+            'profile.post' => $language->get('user', 'profile') . ' &raquo; ' . $language->get('user', 'profile_posts'),
         ]);
 
         // Sitemap
         $pages->registerSitemapMethod([Core_Sitemap::class, 'generateSitemap']);
 
         // Widgets - only load if on a widget staffcp page or the frontend
-        // TODO: check if active page supports widgets, no point to load them if not (ie: login page)
-        if (defined('FRONT_END') || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
+        if ($pages->getActivePage()['widgets'] || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
             // Facebook
             $cache->setCache('social_media');
-            $fb_url = Util::getSetting('fb_url');
+            $fb_url = Settings::get('fb_url');
             if ($fb_url) {
-                $widgets->add(new FacebookWidget($smarty, $fb_url));
+                $widgets->add(new FacebookWidget($template->getEngine(), $fb_url));
             }
 
             // Twitter
-            $twitter = Util::getSetting('twitter_url');
+            $twitter = Settings::get('twitter_url');
 
             if ($twitter) {
-                $theme = Util::getSetting('twitter_style');
-                $widgets->add(new TwitterWidget($smarty, $twitter, $theme));
+                $theme = Settings::get('twitter_style');
+                $widgets->add(new TwitterWidget($template->getEngine(), $twitter, $theme));
             }
 
             // Profile Posts
-            $widgets->add(new ProfilePostsWidget($smarty, $language, $cache, $user, new TimeAgo(TIMEZONE)));
+            $widgets->add(new ProfilePostsWidget($template->getEngine(), $language, $cache, $user, new TimeAgo(TIMEZONE)));
 
             // Online staff
-            $widgets->add(new OnlineStaffWidget($smarty, $language, $cache));
+            $widgets->add(new OnlineStaffWidget($template->getEngine(), $language, $cache));
 
             // Online users
-            $widgets->add(new OnlineUsersWidget($cache, $smarty, $language));
+            $widgets->add(new OnlineUsersWidget($cache, $template->getEngine(), $language));
 
             // Online users
-            $widgets->add(new ServerStatusWidget($smarty, $language, $cache));
+            $widgets->add(new ServerStatusWidget($template->getEngine(), $language, $cache));
 
             // Statistics
-            $widgets->add(new StatsWidget($smarty, $language, $cache));
+            $widgets->add(new StatsWidget($template->getEngine(), $language, $cache));
+
+            // Reactions profile widget
+            $widgets->add(new ReactionsProfileWidget($template->getEngine(), $language));
+
+            // Minecraft account profile widget
+            if (Settings::get('mc_integration')) {
+                $widgets->add(new MinecraftAccountProfileWidget($template->getEngine(), $cache, $language));
+            }
         }
 
         // Validate user hook
-        $validate_action = Util::getSetting('validate_user_action');
+        $validate_action = Settings::get('validate_user_action');
         $validate_action = json_decode($validate_action, true);
 
         if ($validate_action['action'] == 'promote') {
             EventHandler::registerListener(UserValidatedEvent::class, ValidateHook::class);
             define('VALIDATED_DEFAULT', $validate_action['group']);
         }
-
-        // Define default group pre validation
-        $cache->setCache('pre_validation_default');
-        $group_id = null;
-
-        if ($cache->isCached('pre_validation_default')) {
-            $group_id = $cache->retrieve('pre_validation_default');
-
-        } else {
-            $group_id = DB::getInstance()->get('groups', ['default_group', '1'])->results();
-            $group_id = $group_id[0]->id;
-        }
-
-        define('PRE_VALIDATED_DEFAULT', $group_id);
 
         // Check for updates
         if ($user->isLoggedIn()) {
@@ -700,7 +762,7 @@ class Core_Module extends Module {
                 }
 
                 if (!is_string($update_check) && $update_check->updateAvailable()) {
-                    $smarty->assign([
+                    $template->getEngine()->addVariables([
                         'NEW_UPDATE' => $update_check->isUrgent()
                             ? $language->get('admin', 'new_urgent_update_available')
                             : $language->get('admin', 'new_update_available'),
@@ -718,7 +780,7 @@ class Core_Module extends Module {
             }
         }
 
-        if (Util::getSetting('mc_integration') && Util::getSetting('status_page')) {
+        if (Settings::get('mc_integration') && Settings::get('status_page')) {
             // Add status link to navbar
             $cache->setCache('navbar_order');
             if (!$cache->isCached('status_order')) {
@@ -738,32 +800,34 @@ class Core_Module extends Module {
             $navs[0]->add('status', $language->get('general', 'status'), URL::build('/status'), 'top', null, $status_order, $icon);
         }
 
-        $leaderboard_placeholders = Placeholders::getInstance()->getLeaderboardPlaceholders();
+        // Only add leaderboard link if there is at least one enabled placeholder and MC integration enabled
+        if (Settings::get('mc_integration') && Settings::get('placeholders') === '1') {
+            $leaderboard_placeholders = Placeholders::getInstance()->getLeaderboardPlaceholders();
 
-        // Only add leaderboard link if there is at least one enabled placeholder
-        if (Util::getSetting('mc_integration') && Util::getSetting('placeholders') === '1' && count($leaderboard_placeholders)) {
-            $cache->setCache('navbar_order');
-            if (!$cache->isCached('leaderboards_order')) {
-                $leaderboards_order = 4;
-                $cache->store('leaderboards_order', 4);
-            } else {
-                $leaderboards_order = $cache->retrieve('leaderboards_order');
+            if (count($leaderboard_placeholders)) {
+                $cache->setCache('navbar_order');
+                if (!$cache->isCached('leaderboards_order')) {
+                    $leaderboards_order = 4;
+                    $cache->store('leaderboards_order', 4);
+                } else {
+                    $leaderboards_order = $cache->retrieve('leaderboards_order');
+                }
+
+                $cache->setCache('navbar_icons');
+                if (!$cache->isCached('leaderboards_icon')) {
+                    $leaderboards_icon = '';
+                } else {
+                    $leaderboards_icon = $cache->retrieve('leaderboards_icon');
+                }
+
+                $navs[0]->add('leaderboards', $language->get('general', 'leaderboards'), URL::build('/leaderboards'), 'top', null, $leaderboards_order, $leaderboards_icon);
             }
-
-            $cache->setCache('navbar_icons');
-            if (!$cache->isCached('leaderboards_icon')) {
-                $leaderboards_icon = '';
-            } else {
-                $leaderboards_icon = $cache->retrieve('leaderboards_icon');
-            }
-
-            $navs[0]->add('leaderboards', $language->get('general', 'leaderboards'), URL::build('/leaderboards'), 'top', null, $leaderboards_order, $leaderboards_icon);
         }
 
         // Check page type (frontend or backend)
         if (defined('FRONT_END')) {
             // Minecraft integration?
-            if (Util::getSetting('mc_integration')) {
+            if (Settings::get('mc_integration')) {
                 // Query main server
                 $cache->setCache('mc_default_server');
 
@@ -796,10 +860,10 @@ class Core_Module extends Module {
                     }
 
                     if (!is_null($default) && isset($default->ip)) {
-                        $full_ip = ['ip' => $default->ip . (is_null($default->port) ? '' : ':' . $default->port), 'pre' => $default->pre, 'name' => $default->name];
+                        $full_ip = ['ip' => $default->ip . (is_null($default->port) ? '' : ':' . $default->port), 'pre' => $default->pre, 'name' => $default->name, 'id' => $default->id];
 
                         // Get query type
-                        $query_type = Util::getSetting('query_type', 'internal');
+                        $query_type = Settings::get('query_type', 'internal');
 
                         if (isset($sub_servers) && count($sub_servers)) {
                             $servers = [$full_ip];
@@ -861,41 +925,57 @@ class Core_Module extends Module {
                     }
                 }
 
-                $smarty->assign('MINECRAFT', true);
+                $template->getEngine()->addVariable('MINECRAFT', true);
 
                 if (isset($result)) {
-                    $smarty->assign('SERVER_QUERY', $result);
+                    $template->getEngine()->addVariable('SERVER_QUERY', $result);
                 }
 
                 if (!is_null($default) && isset($default->ip)) {
-                    $smarty->assign('CONNECT_WITH', $language->get('general', 'connect_with_ip_x', [
-                        'address' => '<span id="ip">' . Output::getClean($default->ip . ($default->port && $default->port != 25565 ? ':' . $default->port : '')) . '</span>',
-                    ]));
-                    $smarty->assign('DEFAULT_IP', Output::getClean($default->ip . ($default->port != 25565 ? ':' . $default->port : '')));
-                    $smarty->assign('CLICK_TO_COPY_TOOLTIP', $language->get('general', 'click_to_copy_tooltip'));
-                    $smarty->assign('COPIED', $language->get('general', 'copied'));
+                    $template->getEngine()->addVariables([
+                        'CONNECT_WITH' => $language->get('general', 'connect_with_ip_x', [
+                            'address' => '<span id="ip">' . Output::getClean($default->ip . ($default->port && $default->port != 25565 ? ':' . $default->port : '')) . '</span>',
+                        ]),
+                        'DEFAULT_IP' => Output::getClean($default->ip . ($default->port != 25565 ? ':' . $default->port : '')),
+                        'CLICK_TO_COPY_TOOLTIP' => $language->get('general', 'click_to_copy_tooltip'),
+                        'COPIED' => $language->get('general', 'copied'),
+                    ]);
                 } else {
-                    $smarty->assign('CONNECT_WITH', '');
-                    $smarty->assign('DEFAULT_IP', '');
+                    $template->getEngine()->addVariables([
+                        'CONNECT_WITH' => '',
+                        'DEFAULT_IP' => '',
+                    ]);
                 }
 
-                $smarty->assign('SERVER_OFFLINE', $language->get('general', 'server_offline'));
+                $template->getEngine()->addVariable('SERVER_OFFLINE', $language->get('general', 'server_offline'));
 
             }
 
             if (defined('PAGE') && PAGE == 'user_query') {
                 // Collection
-                $user_id = $smarty->getTemplateVars('USER_ID');
+                $user_id = $template->getEngine()->getVariable('USER_ID');
 
-                $timeago = new TimeAgo(TIMEZONE);
+                $timeAgo = new TimeAgo(TIMEZONE);
 
                 if ($user_id) {
                     $user_query = DB::getInstance()->get('users', ['id', $user_id])->results();
                     if (count($user_query)) {
-                        $user_query = $user_query[0];
-                        $smarty->assign('REGISTERED', $language->get('user', 'registered_x', [
-                            'registeredAt' => $timeago->inWords($user_query->joined, $language),
-                        ]));
+                        $user_query = new UserData($user_query[0]);
+                        $template->getEngine()->addVariables([
+                            'REGISTERED' => $language->get('user', 'registered_x', [
+                                'registeredAt' => $timeAgo->inWords($user_query->joined, $language),
+                            ]),
+                            'REGISTERED_DATE' => date(DATE_FORMAT, $user_query->joined),
+                        ]);
+
+                        if ($user->canBypassPrivateProfile() || (!Settings::get('private_profile') || !$user_query->private_profile)) {
+                            $template->getEngine()->addVariables([
+                                'LAST_SEEN' => $language->get('user', 'last_seen_x', [
+                                    'lastSeenAt' => $timeAgo->inWords($user_query->last_online, $language),
+                                ]),
+                                'LAST_SEEN_DATE' => date(DATE_FORMAT, $user_query->last_online)
+                            ]);
+                        }
                     }
                 }
             }
@@ -1036,6 +1116,17 @@ class Core_Module extends Module {
                     $navs[2]->addItemToDropdown('core_configuration', 'privacy_and_terms', $language->get('admin', 'privacy_and_terms'), URL::build('/panel/core/privacy_and_terms'), 'top', null, $icon, $order);
                 }
 
+                if ($user->hasPermission('admincp.core.queue')) {
+                    if (!$cache->isCached('queue_icon')) {
+                        $icon = '<i class="nav-icon fas fa-clock"></i>';
+                        $cache->store('queue_icon', $icon);
+                    } else {
+                        $icon = $cache->retrieve('queue_icon');
+                    }
+
+                    $navs[2]->addItemToDropdown('core_configuration', 'queue', $language->get('admin', 'queue'), URL::build('/panel/core/queue'), 'top', null, $icon, $order);
+                }
+
                 if ($user->hasPermission('admincp.core.reactions')) {
                     if (!$cache->isCached('reactions_icon')) {
                         $icon = '<i class="nav-icon fas fa-smile"></i>';
@@ -1081,7 +1172,7 @@ class Core_Module extends Module {
                 }
             }
 
-            if ($user->hasPermission('admincp.core.announcements')) {
+            if ($user->hasPermission('admincp.core.announcements') || $user->hasPermission('admincp.core.emails_mass_message')) {
                 if (!$cache->isCached('announcements_order')) {
                     $order = 4;
                     $cache->store('announcements_order', 4);
@@ -1096,7 +1187,22 @@ class Core_Module extends Module {
                     $icon = $cache->retrieve('announcements_icon');
                 }
 
-                $navs[2]->add('announcements', $language->get('admin', 'announcements'), URL::build('/panel/core/announcements'), 'top', null, $order, $icon);
+                $navs[2]->addDropdown('announcements', $language->get('admin', 'communications'), 'top', $order, $icon);
+
+                if ($user->hasPermission('admincp.core.announcements')) {
+                    $navs[2]->addItemToDropdown('announcements', 'announcements', $language->get('admin', 'announcements'), URL::build('/panel/core/announcements'), 'top', null, $icon, 1);
+                }
+
+                if ($user->hasPermission('admincp.core.emails_mass_message')) {
+                    if (!$cache->isCached('mass_message_icon')) {
+                        $icon = '<i class="nav-icon fas fa-envelopes-bulk"></i>';
+                        $cache->store('mass_message_icon', $icon);
+                    } else {
+                        $icon = $cache->retrieve('mass_message_icon');
+                    }
+
+                    $navs[2]->addItemToDropdown('announcements', 'mass_message', $language->get('admin', 'mass_message'), URL::build('/panel/core/mass_message'), 'top', null, $icon, 1);
+                }
             }
 
             if ($user->hasPermission('admincp.integrations')) {
@@ -1410,26 +1516,26 @@ class Core_Module extends Module {
                 self::addDataToDashboardGraph($language->get('admin', 'overview'), $data);
 
                 // Dashboard stats
-                require_once(ROOT_PATH . '/modules/Core/collections/panel/TotalUsers.php');
-                CollectionManager::addItemToCollection('dashboard_stats', new TotalUsersItem($smarty, $language, $cache));
+                require_once ROOT_PATH . '/modules/Core/collections/panel/TotalUsers.php';
+                CollectionManager::addItemToCollection('dashboard_stats', new TotalUsersItem($template->getEngine(), $language, $cache));
 
-                require_once(ROOT_PATH . '/modules/Core/collections/panel/RecentUsers.php');
-                CollectionManager::addItemToCollection('dashboard_stats', new RecentUsersItem($smarty, $language, $cache));
+                require_once ROOT_PATH . '/modules/Core/collections/panel/RecentUsers.php';
+                CollectionManager::addItemToCollection('dashboard_stats', new RecentUsersItem($template->getEngine(), $language, $cache));
 
                 // Dashboard items
                 if ($user->hasPermission('modcp.punishments')) {
-                    require_once(ROOT_PATH . '/modules/Core/collections/panel/RecentPunishments.php');
-                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentPunishmentsItem($smarty, $language, $cache));
+                    require_once ROOT_PATH . '/modules/Core/collections/panel/RecentPunishments.php';
+                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentPunishmentsItem($template->getEngine(), $language, $cache));
                 }
 
                 if ($user->hasPermission('modcp.reports')) {
-                    require_once(ROOT_PATH . '/modules/Core/collections/panel/RecentReports.php');
-                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentReportsItem($smarty, $language, $cache));
+                    require_once ROOT_PATH . '/modules/Core/collections/panel/RecentReports.php';
+                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentReportsItem($template->getEngine(), $language, $cache));
                 }
 
                 if ($user->hasPermission('admincp.users')) {
-                    require_once(ROOT_PATH . '/modules/Core/collections/panel/RecentRegistrations.php');
-                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentRegistrationsItem($smarty, $language, $cache));
+                    require_once ROOT_PATH . '/modules/Core/collections/panel/RecentRegistrations.php';
+                    CollectionManager::addItemToCollection('dashboard_main_items', new RecentRegistrationsItem($template->getEngine(), $language, $cache));
                 }
             }
 
@@ -1441,8 +1547,8 @@ class Core_Module extends Module {
                 self::addUserAction($language->get('admin', 'integrations'), URL::build('/panel/users/integrations/', 'id={id}'));
             }
 
-            if ($user->hasPermission('admincp.users.edit')) {
-                self::addUserAction($language->get('admin', 'oauth'), URL::build('/panel/users/oauth/', 'id={id}'));
+            if ($user->hasPermission('admincp.users.sessions')) {
+                self::addUserAction($language->get('general', 'sessions'), URL::build('/panel/users/sessions', 'id={id}'));
             }
 
             if ($user->hasPermission('modcp.ip_lookup')) {
@@ -1505,7 +1611,7 @@ class Core_Module extends Module {
 
     public function getDebugInfo(): array {
         $servers = [];
-        $group_sync_server_id = Util::getSetting('group_sync_mc_server');
+        $group_sync_server_id = Settings::get('group_sync_mc_server');
         foreach (DB::getInstance()->get('mc_servers', ['id', '<>', 0])->results() as $server) {
             $servers[(int)$server->id] = [
                 'id' => (int)$server->id,
@@ -1521,10 +1627,10 @@ class Core_Module extends Module {
 
         return [
             'minecraft' => [
-                'mc_integration' => (bool)Util::getSetting('mc_integration'),
-                'uuid_linking' => (bool)Util::getSetting('uuid_linking'),
-                'username_sync' => (bool)Util::getSetting('username_sync'),
-                'query_type' => Util::getSetting('query_type', 'internal'),
+                'mc_integration' => (bool)Settings::get(Settings::MINECRAFT_INTEGRATION),
+                'uuid_linking' => (bool)Settings::get('uuid_linking'),
+                'username_sync' => Settings::get('username_sync'),
+                'query_type' => Settings::get('query_type', 'internal'),
                 'servers' => $servers,
             ]
         ];

@@ -1,17 +1,26 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr13
+/**
+ * AuthMe connector
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Authme connector
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 $page_title = $language->get('general', 'register');
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
-require_once(ROOT_PATH . '/modules/Core/includes/emails/register.php');
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
+require_once ROOT_PATH . '/modules/Core/includes/emails/register.php';
 
 // Use recaptcha?
 $captcha = CaptchaBase::isCaptchaEnabled();
@@ -43,7 +52,7 @@ if (Input::exists()) {
             ];
 
             // Are custom usernames enabled?
-            if (Util::getSetting('displaynames') === '1') {
+            if (Settings::get('displaynames') === '1') {
                 $to_validation['nickname'] = [
                     Validate::REQUIRED => true,
                     Validate::MIN => 3,
@@ -117,7 +126,7 @@ if (Input::exists()) {
                 }
 
                 $mcname = Output::getClean($_SESSION['authme']['username']);
-                if (Util::getSetting('displaynames') === '1') {
+                if (Settings::get('displaynames') === '1') {
                     $nickname = Input::get('nickname');
                 } else {
                     $nickname = $mcname;
@@ -167,17 +176,9 @@ if (Input::exists()) {
                     $user = new User($user_id);
                     $user->addGroup($default_group);
 
-                    EventHandler::executeEvent('registerUser', [
-                            'user_id' => $user_id,
-                            'username' => $user->getDisplayname(),
-                            'content' => $language->get('user', 'user_x_has_registered', [
-                                'user' => $user->getDisplayname(),
-                            ]),
-                            'avatar_url' => $user->getAvatar(128, true),
-                            'url' => URL::getSelfURL() . ltrim($user->getProfileURL(), '/'),
-                            'language' => $language,
-                        ]
-                    );
+                    EventHandler::executeEvent(new UserRegisteredEvent(
+                        $user,
+                    ));
 
                     // Link the minecraft integration
                     $integration->successfulRegistration($user);
@@ -197,7 +198,7 @@ if (Input::exists()) {
 
                     unset($_SESSION['authme']);
 
-                    if (Util::getSetting('email_verification') === '1') {
+                    if (Settings::get('email_verification') === '1') {
                         // Send registration email
                         sendRegisterEmail($language, $email, $mcname, $user_id, $code);
 
@@ -356,13 +357,13 @@ if (Input::exists()) {
 }
 
 if (count($errors)) {
-    $smarty->assign('ERRORS', $errors);
+    $template->getEngine()->addVariable('ERRORS', $errors);
 }
 
-$smarty->assign('ERROR', $language->get('general', 'error'));
+$template->getEngine()->addVariable('ERROR', $language->get('general', 'error'));
 
 if (!isset($_GET['step'])) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'AUTHME_SETUP' => Config::get('authme'),
         'AUTHME_NOT_SETUP' => $language->get('user', 'authme_not_setup'),
         'CONNECT_WITH_AUTHME' => $language->get('user', 'connect_with_authme'),
@@ -381,7 +382,7 @@ if (!isset($_GET['step'])) {
 
     // Recaptcha
     if ($captcha) {
-        $smarty->assign('CAPTCHA', CaptchaBase::getActiveProvider()->getHtml());
+        $template->getEngine()->addVariable('CAPTCHA', CaptchaBase::getActiveProvider()->getHtml());
         $template->addJSFiles([CaptchaBase::getActiveProvider()->getJavascriptSource() => []]);
 
         $submitScript = CaptchaBase::getActiveProvider()->getJavascriptSubmit('form-contact');
@@ -395,12 +396,12 @@ if (!isset($_GET['step'])) {
         }
     }
 
-    $template_file = ROOT_PATH . '/custom/templates/' . TEMPLATE . '/authme.tpl';
+    $template_file = ROOT_PATH . '/custom/templates/' . TEMPLATE . '/authme';
 } else {
     $fields = new Fields();
     // Step 2
     // Are custom usernames enabled?
-    if (Util::getSetting('displaynames') === '1') {
+    if (Settings::get('displaynames') === '1') {
         $info = $language->get('user', 'authme_email_help_2');
         $fields->add('nickname', Fields::TEXT, $language->get('user', 'nickname'), true, Output::getClean(Input::get('nickname')));
     } else {
@@ -426,7 +427,7 @@ if (!isset($_GET['step'])) {
         );
     }
 
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'CONNECT_WITH_AUTHME' => $language->get('user', 'connect_with_authme'),
         'AUTHME_SYNC_PASSWORD' => $language->get('user', 'authme_sync_password'),
         'AUTHME_SYNC_PASSWORD_HELP' => $language->get('user', 'authme_sync_password_help'),
@@ -438,7 +439,7 @@ if (!isset($_GET['step'])) {
         'SUBMIT' => $language->get('general', 'submit'),
     ]);
 
-    $template_file = ROOT_PATH . '/custom/templates/' . TEMPLATE . '/authme_email.tpl';
+    $template_file = ROOT_PATH . '/custom/templates/' . TEMPLATE . '/authme_email';
 }
 
 // Load modules + template
@@ -446,7 +447,7 @@ Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/navbar.php');
-require(ROOT_PATH . '/core/templates/footer.php');
+require ROOT_PATH . '/core/templates/navbar.php';
+require ROOT_PATH . '/core/templates/footer.php';
 
-$template->displayTemplate($template_file, $smarty);
+$template->displayTemplate($template_file);

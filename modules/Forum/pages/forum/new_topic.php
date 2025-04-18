@@ -1,18 +1,28 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr13
+/**
+ * Forum new topic page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  New topic page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $forum_language
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 // Always define page name
 const PAGE = 'forum';
 $page_title = $forum_language->get('forum', 'new_topic');
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
 
 // User must be logged in to proceed
 if (!$user->isLoggedIn()) {
@@ -46,7 +56,7 @@ $current_forum = DB::getInstance()->query('SELECT * FROM nl2_forums WHERE id = ?
 $forum_title = Output::getClean($current_forum->forum_title);
 
 // Topic labels
-$smarty->assign('LABELS_TEXT', $forum_language->get('forum', 'label'));
+$template->getEngine()->addVariable('LABELS_TEXT', $forum_language->get('forum', 'label'));
 $labels = [];
 
 $default_labels = $current_forum->default_labels ? explode(',', $current_forum->default_labels) : [];
@@ -94,14 +104,19 @@ if (count($forum_labels)) {
 if (Input::exists()) {
     if (Token::check()) {
         // Check post limits
-        $last_post = DB::getInstance()->orderWhere('posts', 'post_creator = ' . $user->data()->id, 'post_date', 'DESC LIMIT 1')->results();
-        if (count($last_post)) {
-            if ($last_post[0]->created > strtotime('-30 seconds')) {
-                $spam_check = true;
+        $spamTimer = Settings::get('spam_timer', 30, 'forum');
+        $lastPost = DB::getInstance()->query(
+            'SELECT `created` FROM nl2_posts WHERE post_creator = ? ORDER BY `created` DESC LIMIT 1',
+            [$user->data()->id]
+        );
+
+        if ($lastPost->count()) {
+            if ($lastPost->first()->created > strtotime("-$spamTimer seconds")) {
+                $spamCheck = true;
             }
         }
 
-        if (!isset($spam_check)) {
+        if (!isset($spamCheck)) {
             // Spam check passed
             $validate = Validate::check($_POST, [
                 'title' => [
@@ -112,7 +127,8 @@ if (Input::exists()) {
                 'content' => [
                     Validate::REQUIRED => true,
                     Validate::MIN => 2,
-                    Validate::MAX => 50000
+                    Validate::MAX => 50000,
+                    Validate::NOT_CONTAIN => Forum::getBannedTerms(),
                 ]
             ])->messages([
                 'title' => [
@@ -123,7 +139,8 @@ if (Input::exists()) {
                 'content' => [
                     Validate::REQUIRED => $forum_language->get('forum', 'content_required'),
                     Validate::MIN => $forum_language->get('forum', 'content_min_2'),
-                    Validate::MAX => $forum_language->get('forum', 'content_max_50000')
+                    Validate::MAX => $forum_language->get('forum', 'content_max_50000'),
+                    Validate::NOT_CONTAIN => $forum_language->get('forum', 'content_contains_banned_term'),
                 ]
             ]);
 
@@ -201,7 +218,7 @@ if (Input::exists()) {
 
                 // Execute hooks and pass $available_hooks
                 $available_hooks = DB::getInstance()->get('forums', ['id', $fid])->first();
-                $available_hooks = json_decode($available_hooks->hooks);
+                $available_hooks = json_decode($available_hooks->hooks) ?? [];
                 EventHandler::executeEvent(new TopicCreatedEvent(
                     $user,
                     $forum_title,
@@ -218,7 +235,7 @@ if (Input::exists()) {
                 $error = $validate->errors();
             }
         } else {
-            $error = [$forum_language->get('forum', 'spam_wait', ['count' => (strtotime($last_post[0]->post_date) - strtotime('-30 seconds'))])];
+            $error = [$forum_language->get('forum', 'spam_wait', ['count' => ($lastPost->first()->created - strtotime("-$spamTimer seconds"))])];
         }
     } else {
         $error = [$language->get('general', 'invalid_token')];
@@ -230,11 +247,11 @@ $token = Token::get();
 
 // Generate content for template
 if (isset($error)) {
-    $smarty->assign('ERROR', $error);
+    $template->getEngine()->addVariable('ERROR', $error);
 }
 
 $creating_topic_in = $forum_language->get('forum', 'creating_topic_in_x', ['forum' => $forum_title]);
-$smarty->assign('CREATING_TOPIC_IN', $creating_topic_in);
+$template->getEngine()->addVariable('CREATING_TOPIC_IN', $creating_topic_in);
 
 // Get info about forum
 $forum_query = DB::getInstance()->get('forums', ['id', $fid])->results();
@@ -245,8 +262,8 @@ if ($forum_query->topic_placeholder) {
     $placeholder = Output::getPurified($forum_query->topic_placeholder);
 }
 
-// Smarty variables
-$smarty->assign([
+// Template variables
+$template->getEngine()->addVariables([
     'LABELS' => $labels,
     'TOPIC_TITLE' => $forum_language->get('forum', 'topic_title'),
     'TOPIC_VALUE' => ((isset($_POST['title']) && $_POST['title']) ? Output::getClean(Input::get('title')) : ''),
@@ -282,8 +299,8 @@ Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/navbar.php');
-require(ROOT_PATH . '/core/templates/footer.php');
+require ROOT_PATH . '/core/templates/navbar.php';
+require ROOT_PATH . '/core/templates/footer.php';
 
 // Display template
-$template->displayTemplate('forum/new_topic.tpl', $smarty);
+$template->displayTemplate('forum/new_topic');

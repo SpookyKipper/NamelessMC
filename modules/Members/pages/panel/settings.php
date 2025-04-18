@@ -1,20 +1,40 @@
 <?php
+/**
+ * Staff panel members settings page
+ *
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
+ *
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Language $members_language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
+ */
 
 if (!$user->handlePanelPageLoad('admincp.members')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
 const PAGE = 'panel';
-const PARENT_PAGE = 'member_lists';
+const PARENT_PAGE = 'members';
 const PANEL_PAGE = 'members_settings';
+
 $page_title = $members_language->get('members', 'members');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 if (Input::exists()) {
     if (Token::check()) {
-        Util::setSetting('member_list_viewable_groups', json_encode(Input::get('groups')), 'Members');
-        Util::setSetting('member_list_hide_banned', Input::get('hide_banned_users'), 'Members');
+        Settings::set('member_list_viewable_groups', json_encode(Input::get('groups')), 'Members');
+        Settings::set('member_list_hide_banned', Input::get('hide_banned_users'), 'Members');
 
         // Update link location
         if (isset($_POST['link_location'])) {
@@ -52,16 +72,16 @@ $link_location = $cache->retrieve('members_location');
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
 if (Session::exists('admin_members_settings')) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => Session::flash('admin_members_settings'),
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (Session::exists('admin_members_settings_error')) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERROR' => Session::flash('admin_members_settings_error'),
-        'ERRORS_TITLE' => $language->get('general', 'success')
+        'ERRORS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
@@ -73,7 +93,7 @@ foreach (Group::all() as $group) {
     ];
 }
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'MEMBERS' => $members_language->get('members', 'members'),
@@ -85,10 +105,10 @@ $smarty->assign([
     'LINK_FOOTER' => $language->get('admin', 'page_link_footer'),
     'LINK_NONE' => $language->get('admin', 'page_link_none'),
     'HIDE_BANNED_USERS' => $members_language->get('members', 'member_list_hide_banned_users'),
-    'HIDE_BANNED_USERS_VALUE' => Util::getSetting('member_list_hide_banned', false, 'Members'),
+    'HIDE_BANNED_USERS_VALUE' => Settings::get('member_list_hide_banned', false, 'Members'),
     'GROUPS' => $members_language->get('members', 'viewable_groups'),
     'GROUPS_ARRAY' => $group_array,
-    'GROUPS_VALUE' => json_decode(Util::getSetting('member_list_viewable_groups', '{}', 'Members'), true),
+    'GROUPS_VALUE' => json_decode(Settings::get('member_list_viewable_groups', '{}', 'Members'), true) ?: [],
     'NO_ITEM_SELECTED' => $language->get('admin', 'no_item_selected'),
     'PAGE' => PANEL_PAGE,
     'TOKEN' => Token::get(),
@@ -97,7 +117,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('members/members_settings.tpl', $smarty);
+$template->displayTemplate('members/members_settings');

@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Aberdeener
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr9
+/**
+ * Staff panel Discord page
  *
- *  License: MIT
+ * @author Aberdeener
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel Discord page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.discord')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,7 +27,7 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'integrations';
 const PANEL_PAGE = 'discord';
 $page_title = Discord::getLanguageTerm('discord');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 if (Input::exists()) {
     $errors = [];
@@ -42,7 +51,7 @@ if (Input::exists()) {
             ]);
 
             if ($validation->passed()) {
-                Util::setSetting('discord', Input::get('discord_guild_id'));
+                Settings::set('discord', Input::get('discord_guild_id'));
 
                 $success = Discord::getLanguageTerm('discord_settings_updated');
 
@@ -58,12 +67,12 @@ if (Input::exists()) {
                         'linkStart' => '<a href="https://github.com/NamelessMC/Nameless-Link/wiki/Setup" target="_blank">',
                         'linkEnd' => '</a>',
                     ]);
-                    Util::setSetting('discord_integration', '0');
+                    Settings::set('discord_integration', '0');
                 } else {
-                    Util::setSetting('discord_integration', '1');
+                    Settings::set('discord_integration', '1');
                 }
             } else {
-                Util::setSetting('discord_integration', '0');
+                Settings::set('discord_integration', '0');
             }
         }
 
@@ -85,29 +94,29 @@ if (Session::exists('discord_success')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
 if (Session::exists('discord_error')) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => [Session::flash('discord_error')],
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
 // TODO: Add a check to see if the bot is online using `/status` endpoint Discord::botRequest('/status');
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'INTEGRATIONS' => $language->get('admin', 'integrations'),
@@ -140,7 +149,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('integrations/discord/discord.tpl', $smarty);
+$template->displayTemplate('integrations/discord/discord');

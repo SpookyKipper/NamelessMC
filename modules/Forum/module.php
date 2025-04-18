@@ -1,12 +1,10 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0
+/**
+ * NamelessMC Forum Module
  *
- *  License: MIT
- *
- *  Forum module file
+ * @author Samerton
+ * @version 2.2.0
+ * @license MIT
  */
 
 class Forum_Module extends Module {
@@ -19,9 +17,9 @@ class Forum_Module extends Module {
         $this->_forum_language = $forum_language;
 
         $name = 'Forum';
-        $author = '<a href="https://samerton.me" target="_blank" rel="nofollow noopener">Samerton</a>';
-        $module_version = '2.0.3';
-        $nameless_version = '2.0.3';
+        $author = '<a href="https://samerton.dev" target="_blank" rel="nofollow noopener">Samerton</a>';
+        $module_version = '2.2.0';
+        $nameless_version = '2.2.0';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
@@ -45,7 +43,6 @@ class Forum_Module extends Module {
         $pages->add('Forum', '/forum/edit', 'pages/forum/edit.php');
         $pages->add('Forum', '/forum/lock', 'pages/forum/lock.php');
         $pages->add('Forum', '/forum/stick', 'pages/forum/stick.php');
-        $pages->add('Forum', '/forum/reactions', 'pages/forum/reactions.php');
         $pages->add('Forum', '/forum/search', 'pages/forum/search.php');
 
         // UserCP
@@ -136,40 +133,40 @@ class Forum_Module extends Module {
         EventHandler::registerListener('preTopicCreate', 'MentionsHook::preCreate');
         EventHandler::registerListener('preTopicEdit', 'MentionsHook::preEdit');
 
-        EventHandler::registerListener('renderPost', [ContentHook::class, 'purify']);
-        EventHandler::registerListener('renderPost', [ContentHook::class, 'codeTransform'], 15);
-        EventHandler::registerListener('renderPost', [ContentHook::class, 'decode'], 20);
-        EventHandler::registerListener('renderPost', [ContentHook::class, 'renderEmojis'], 10);
-        EventHandler::registerListener('renderPost', [ContentHook::class, 'replaceAnchors'], 15);
-        EventHandler::registerListener('renderPost', [MentionsHook::class, 'parsePost'], 5);
+        EventHandler::registerListener('renderPost', 'ContentHook::purify');
+        EventHandler::registerListener('renderPost', 'ContentHook::renderEmojis', 10);
+        EventHandler::registerListener('renderPost', 'ContentHook::replaceAnchors', 5);
+        EventHandler::registerListener('renderPost', 'MentionsHook::parsePost', 5);
 
         EventHandler::registerListener('renderPostEdit', 'ContentHook::purify');
-        EventHandler::registerListener('renderPostEdit', 'ContentHook::codeTransform', 15);
-        EventHandler::registerListener('renderPostEdit', 'ContentHook::decode', 20);
         EventHandler::registerListener('renderPostEdit', 'ContentHook::replaceAnchors', 15);
 
-        MemberListManager::getInstance()->registerListProvider(new MostPostsMemberListProvider($forum_language));
-        MemberListManager::getInstance()->registerListProvider(new HighestReactionScoresMemberListProvider($forum_language));
+        if (Util::isModuleEnabled('Members')) {
+            MemberListManager::getInstance()->registerListProvider(new MostPostsMemberListProvider($forum_language));
+            MemberListManager::getInstance()->registerListProvider(new HighestForumReactionScoresMemberListProvider($forum_language));
 
-        MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
-            return [
-                $forum_language->get('forum', 'posts_title') =>
-                    DB::getInstance()->query(
-                        'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ?',
-                        [$member->data()->id]
-                    )->first()->count,
-            ];
-        });
+            MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
+                return [
+                    $forum_language->get('forum', 'posts_title') =>
+                        DB::getInstance()->query(
+                            'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ?',
+                            [$member->data()->id]
+                        )->first()->count,
+                ];
+            });
 
-        MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
-            return [
-                $forum_language->get('forum', 'reaction_score') =>
-                    DB::getInstance()->query(
-                        'SELECT COUNT(fr.user_received) AS `count` FROM nl2_forums_reactions fr JOIN nl2_reactions r ON r.id = fr.reaction_id WHERE r.type = 2 AND fr.user_received = ?',
-                        [$member->data()->id]
-                    )->first()->count,
-            ];
-        });
+            MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
+                return [
+                    $forum_language->get('forum', 'reaction_score') =>
+                        DB::getInstance()->query(
+                            'SELECT COUNT(fr.user_received) AS `count` FROM nl2_forums_reactions fr JOIN nl2_reactions r ON r.id = fr.reaction_id WHERE r.type = 2 AND fr.user_received = ?',
+                            [$member->data()->id]
+                        )->first()->count,
+                ];
+            });
+        }
+
+        ReactionContextsManager::getInstance()->provideContext(new ForumPostReactionContext($forum_language));
     }
 
     public function onInstall() {
@@ -188,7 +185,15 @@ class Forum_Module extends Module {
         // No actions necessary
     }
 
-    public function onPageLoad($user, $pages, $cache, $smarty, $navs, $widgets, $template) {
+    public function onPageLoad(
+        User $user,
+        Pages $pages,
+        Cache $cache,
+        $smarty,
+        iterable $navs,
+        Widgets $widgets,
+        TemplateBase $template
+    ) {
         // AdminCP
         PermissionHandler::registerPermissions('Forum', [
             'admincp.forums' => $this->_language->get('moderator', 'staff_cp') . ' &raquo; ' . $this->_forum_language->get('forum', 'forum')
@@ -237,9 +242,9 @@ class Forum_Module extends Module {
         }
 
         // Widgets
-        if (defined('FRONT_END') || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
+        if ($pages->getActivePage()['widgets'] || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
             // Latest posts
-            $widgets->add(new LatestPostsWidget($this->_forum_language->get('forum', 'latest_posts'), $this->_forum_language->get('forum', 'by'), $smarty, $cache, $user, $this->_language));
+            $widgets->add(new LatestPostsWidget($this->_forum_language, $template->getEngine(), $cache, $user, $this->_language));
         }
 
         // Front end or back end?
@@ -251,20 +256,22 @@ class Forum_Module extends Module {
                 $topic_count = count($topic_count);
                 $post_count = DB::getInstance()->get('posts', ['post_creator', $user->data()->id])->results();
                 $post_count = count($post_count);
-                $smarty->assign('LOGGED_IN_USER_FORUM', [
+                $template->getEngine()->addVariable('LOGGED_IN_USER_FORUM', [
                     'topic_count' => $topic_count,
                     'post_count' => $post_count
                 ]);
             }
 
             if (defined('PAGE') && PAGE == 'user_query') {
-                $user_id = $smarty->getTemplateVars('USER_ID');
+                $user_id = $template->getEngine()->getVariable('USER_ID');
 
                 if ($user_id) {
                     $forum = new Forum();
 
-                    $smarty->assign('TOPICS', $this->_forum_language->get('forum', 'x_topics', ['count' => $forum->getTopicCount($user_id)]));
-                    $smarty->assign('POSTS', $this->_forum_language->get('forum', 'x_posts', ['count' => $forum->getPostCount($user_id)]));
+                    $template->getEngine()->addVariables([
+                        'TOPICS' => $this->_forum_language->get('forum', 'x_topics', ['count' => $forum->getTopicCount($user_id)]),
+                        'POSTS' => $this->_forum_language->get('forum', 'x_posts', ['count' => $forum->getPostCount($user_id)])
+                    ]);
                 }
             }
 
@@ -379,11 +386,11 @@ class Forum_Module extends Module {
                     Core_Module::addDataToDashboardGraph($this->_language->get('admin', 'overview'), $data);
 
                     // Dashboard stats
-                    require_once(ROOT_PATH . '/modules/Forum/collections/panel/RecentTopics.php');
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($smarty, $this->_forum_language, $cache, $latest_topics_count));
+                    require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentTopics.php';
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($template->getEngine(), $this->_forum_language, $cache, $latest_topics_count));
 
-                    require_once(ROOT_PATH . '/modules/Forum/collections/panel/RecentPosts.php');
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($smarty, $this->_forum_language, $cache, $latest_posts_count));
+                    require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentPosts.php';
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($template->getEngine(), $this->_forum_language, $cache, $latest_posts_count));
 
                 }
             }

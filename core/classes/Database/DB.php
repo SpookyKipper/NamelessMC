@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Creates a singleton connection to the database with credentials from the config file.
  *
@@ -7,12 +8,13 @@
  * @version 2.0.0-pr13
  * @license MIT
  */
-class DB {
-
+class DB
+{
     private static ?DB $_instance = null;
 
     private string $_prefix;
     private ?string $_force_charset;
+    private ?string $_force_collation;
     protected PDO $_pdo;
     private PDOStatement $_statement;
     private bool $_error = false;
@@ -20,8 +22,18 @@ class DB {
     private int $_count = 0;
     protected QueryRecorder $_query_recorder;
 
-    private function __construct(string $host, string $database, string $username, string $password, int $port, ?string $force_charset, string $prefix) {
+    private function __construct(
+        string $host,
+        string $database,
+        string $username,
+        string $password,
+        int $port,
+        ?string $force_charset,
+        ?string $force_collation,
+        string $prefix
+    ) {
         $this->_force_charset = $force_charset;
+        $this->_force_collation = $force_collation;
         $this->_prefix = $prefix;
 
         $connection_string = 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $database;
@@ -47,12 +59,23 @@ class DB {
         string $password,
         int $port = 3306,
         ?string $force_charset = null,
+        ?string $force_collation = null,
         string $prefix = 'nl2_'
     ): DB {
-        return new DB($host, $database, $username, $password, $port, $force_charset, $prefix);
+        return new DB(
+            $host,
+            $database,
+            $username,
+            $password,
+            $port,
+            $force_charset,
+            $force_collation,
+            $prefix
+        );
     }
 
-    public static function getInstance(): DB {
+    public static function getInstance(): DB
+    {
         if (self::$_instance) {
             return self::$_instance;
         }
@@ -63,13 +86,20 @@ class DB {
             $force_charset = null;
         }
 
+        if (Config::get('mysql.initialise_collation')) {
+            $force_collation = Config::get('mysql.collation') ?: 'utf8mb4_unicode_ci';
+        } else {
+            $force_collation = null;
+        }
+
         return self::$_instance = self::getCustomInstance(
             Config::get('mysql.host'),
             Config::get('mysql.db'),
             Config::get('mysql.username'),
             Config::get('mysql.password'),
             Config::get('mysql.port'),
-            $force_charset
+            $force_charset,
+            $force_collation
         );
     }
 
@@ -78,29 +108,57 @@ class DB {
      *
      * @return PDO The PDO instance.
      */
-    public function getPDO(): PDO {
+    public function getPDO(): PDO
+    {
         return $this->_pdo;
+    }
+
+    /**
+     * Begin a MySQL transaction.
+     */
+    public function beginTransaction(): void
+    {
+        $this->_pdo->beginTransaction();
+    }
+
+    /**
+     * Commit a MySQL transaction.
+     */
+    public function commitTransaction(): void
+    {
+        if ($this->_pdo->inTransaction()) {
+            $this->_pdo->commit();
+        }
+    }
+
+    /**
+     * Roll back a MySQL transaction.
+     */
+    public function rollBackTransaction(): void
+    {
+        if ($this->_pdo->inTransaction()) {
+            $this->_pdo->rollBack();
+        }
     }
 
     /**
      * Execute a database query within a MySQL transaction, and get the results of the query, if any.
      *
-     * @param Closure(DB): mixed $closure The closure to pass this instance to and execute within a transaction context.
-     * @return mixed The results of the query, null if none.
+     * @param  Closure(DB): mixed $closure The closure to pass this instance to and execute within a transaction context.
+     * @return mixed              The results of the query, null if none.
      */
-    public function transaction(Closure $closure) {
+    public function transaction(Closure $closure)
+    {
         $result = null;
 
         try {
-            $this->_pdo->beginTransaction();
+            $this->beginTransaction();
 
             $result = $closure($this);
 
-            $this->_pdo->commit();
+            $this->commitTransaction();
         } catch (Exception $exception) {
-            if ($this->_pdo->inTransaction()) {
-                $this->_pdo->rollBack();
-            }
+            $this->rollBackTransaction();
         }
 
         return $result;
@@ -111,7 +169,8 @@ class DB {
      *
      * @return object|null The result object, or null if no result was returned.
      */
-    public function first(): ?object {
+    public function first(): ?object
+    {
         return $this->results()[0] ?? null;
     }
 
@@ -120,7 +179,8 @@ class DB {
      *
      * @return array The results of the query.
      */
-    public function results(): array {
+    public function results(): array
+    {
         return $this->_results;
     }
 
@@ -129,16 +189,28 @@ class DB {
      *
      * @return int The number of rows.
      */
-    public function count(): int {
+    public function count(): int
+    {
         return $this->_count;
     }
 
     /**
-     * Get the last inserted ID
+     * Get whether any results exist.
+     *
+     * @return bool Whether any results exist.
+     */
+    public function exists(): bool
+    {
+        return $this->_count > 0;
+    }
+
+    /**
+     * Get the last inserted ID.
      *
      * @return string|false ID of the last inserted row or false on failure
      */
-    public function lastId() {
+    public function lastId()
+    {
         return $this->_pdo->lastInsertId();
     }
 
@@ -147,41 +219,53 @@ class DB {
      *
      * @return bool Whether there was an error.
      */
-    public function error(): bool {
+    public function error(): bool
+    {
         return $this->_error;
     }
 
     /**
      * Perform a SELECT query on the database.
      *
-     * @param string $table The table to select from.
-     * @param array $where The where clause.
+     * @param  string       $table The table to select from.
+     * @param  mixed        $where The where clause. If not an array, it will be used for "id" column lookup.
      * @return static|false This instance if successful, false otherwise.
      */
-    public function get(string $table, array $where = []) {
+    public function get(string $table, $where = [])
+    {
+        if (!is_array($where)) {
+            $where = ['id', '=', $where];
+        }
+
         return $this->action('SELECT *', $table, $where);
     }
 
     /**
      * Perform a DELETE query on the database.
      *
-     * @param string $table The table to delete from.
-     * @param array $where The where clause.
+     * @param  string       $table The table to delete from.
+     * @param  mixed        $where The where clause. If not an array, it will be used for "id" column lookup.
      * @return static|false This instance if successful, false otherwise.
      */
-    public function delete(string $table, array $where) {
+    public function delete(string $table, $where)
+    {
+        if (!is_array($where)) {
+            $where = ['id', '=', $where];
+        }
+
         return $this->action('DELETE', $table, $where);
     }
 
     /**
      * Perform a raw SQL query on the database.
      *
-     * @param string $sql The SQL query string to execute.
-     * @param array $params The parameters to bind to the query.
-     * @param bool $isSelect Whether the statement is a select, defaults to null
+     * @param  string $sql      The SQL query string to execute.
+     * @param  array  $params   The parameters to bind to the query.
+     * @param  bool   $isSelect Whether the statement is a select, defaults to null
      * @return static This DB instance.
      */
-    public function query(string $sql, array $params = [], bool $isSelect = null) {
+    public function query(string $sql, array $params = [], ?bool $isSelect = null)
+    {
         $this->_error = false;
         if ($this->_statement = $this->_pdo->prepare($sql)) {
             $x = 1;
@@ -190,7 +274,10 @@ class DB {
                 if (is_bool($param)) {
                     $param = $param ? 1 : 0;
                 }
-                $this->_statement->bindValue($x, $param, is_int($param)
+                $this->_statement->bindValue(
+                    $x,
+                    $param,
+                    is_int($param)
                     ? PDO::PARAM_INT
                     : PDO::PARAM_STR
                 );
@@ -219,12 +306,13 @@ class DB {
     /**
      * Execute some SQL action (which uses a where clause) on the database.
      *
-     * @param string $action The action to perform (SELECT, DELETE).
-     * @param string $table The table to perform the action on.
-     * @param array $where The where clause.
+     * @param  string       $action The action to perform (SELECT, DELETE).
+     * @param  string       $table  The table to perform the action on.
+     * @param  array        $where  The where clause.
      * @return static|false This instance if successful, false otherwise.
      */
-    private function action(string $action, string $table, array $where = []) {
+    private function action(string $action, string $table, array $where = [])
+    {
         [$where, $where_params] = $this->makeWhere($where);
 
         $table = $this->_prefix . $table;
@@ -240,11 +328,12 @@ class DB {
     /**
      * Insert a new row into a table within the database.
      *
-     * @param string $table The table to insert into.
-     * @param array $fields Array of data in "column => value" format to insert.
-     * @return bool Whether an error occurred or not.
+     * @param  string $table  The table to insert into.
+     * @param  array  $fields Array of data in "column => value" format to insert.
+     * @return bool   Whether an error occurred or not.
      */
-    public function insert(string $table, array $fields = []): bool {
+    public function insert(string $table, array $fields = []): bool
+    {
         $keys = array_keys($fields);
         $fieldCount = count($fields);
         $values = '';
@@ -267,12 +356,13 @@ class DB {
     /**
      * Perform an UPDATE query on a table.
      *
-     * @param string $table The table to update.
-     * @param mixed $where The where clause. If not an array, it will be used for "id" column lookup.
-     * @param array $fields Array of data in "column => value" format to update.
-     * @return bool Whether an error occurred or not.
+     * @param  string $table  The table to update.
+     * @param  mixed  $where  The where clause. If not an array, it will be used for "id" column lookup.
+     * @param  array  $fields Array of data in "column => value" format to update.
+     * @return bool   Whether an error occurred or not.
      */
-    public function update(string $table, $where, array $fields): bool {
+    public function update(string $table, $where, array $fields): bool
+    {
         $set = '';
         $x = 1;
 
@@ -299,12 +389,13 @@ class DB {
     /**
      * Increment a numeric column value by 1.
      *
-     * @param string $table The table to use.
-     * @param int $id The id of the row to increment a column in.
-     * @param string $field The field to increment.
-     * @return bool Whether an error occurred or not.
+     * @param  string $table The table to use.
+     * @param  int    $id    The id of the row to increment a column in.
+     * @param  string $field The field to increment.
+     * @return bool   Whether an error occurred or not.
      */
-    public function increment(string $table, int $id, string $field): bool {
+    public function increment(string $table, int $id, string $field): bool
+    {
         $table = $this->_prefix . $table;
 
         return !$this->query("UPDATE {$table} SET {$field} = {$field} + 1 WHERE id = ?", [$id])->error();
@@ -313,12 +404,13 @@ class DB {
     /**
      * Decrement a numeric column value by 1.
      *
-     * @param string $table The table to use.
-     * @param int $id The id of the row to decrement a column in.
-     * @param string $field The field to increment.
-     * @return bool Whether an error occurred or not.
+     * @param  string $table The table to use.
+     * @param  int    $id    The id of the row to decrement a column in.
+     * @param  string $field The field to increment.
+     * @return bool   Whether an error occurred or not.
      */
-    public function decrement(string $table, int $id, string $field): bool {
+    public function decrement(string $table, int $id, string $field): bool
+    {
         $table = $this->_prefix . $table;
 
         return !$this->query("UPDATE {$table} SET {$field} = {$field} - 1 WHERE id = ?", [$id])->error();
@@ -327,12 +419,13 @@ class DB {
     /**
      * Select rows from the database, ordering by a specific column and sort type.
      *
-     * @param string $table The table to use.
-     * @param string $order The column to order by.
-     * @param string $sort ASC or DESC
+     * @param  string       $table The table to use.
+     * @param  string       $order The column to order by.
+     * @param  string       $sort  ASC or DESC
      * @return static|false This instance if successful, false otherwise.
      */
-    public function orderAll(string $table, string $order, string $sort) {
+    public function orderAll(string $table, string $order, string $sort)
+    {
         $table = $this->_prefix . $table;
         $sql = "SELECT * FROM {$table} ORDER BY {$order} {$sort}";
 
@@ -346,12 +439,13 @@ class DB {
     /**
      * Select rows from the database with a where clause, ordering by a specific column and sort type.
      *
-     * @param string $table The table to use.
-     * @param string $order The column to order by.
-     * @param string $sort ASC or DESC
+     * @param  string       $table The table to use.
+     * @param  string       $order The column to order by.
+     * @param  string       $sort  ASC or DESC
      * @return static|false This instance if successful, false otherwise.
      */
-    public function orderWhere(string $table, string $where, string $order, string $sort) {
+    public function orderWhere(string $table, string $where, string $order, string $sort)
+    {
         $table = $this->_prefix . $table;
         $sql = "SELECT * FROM {$table} WHERE {$where} ORDER BY {$order} {$sort}";
 
@@ -365,15 +459,21 @@ class DB {
     /**
      * Create a new table in the database.
      *
-     * @param string $name The name of the table.
-     * @param string $table_schema The table SQL schema.
-     * @return bool Whether an error occurred or not.
+     * @param  string $name         The name of the table.
+     * @param  string $table_schema The table SQL schema.
+     * @return bool   Whether an error occurred or not.
      */
-    public function createTable(string $name, string $table_schema): bool {
+    public function createTable(string $name, string $table_schema): bool
+    {
         $name = $this->_prefix . $name;
         $sql = "CREATE TABLE `{$name}` ({$table_schema}) ENGINE=InnoDB";
+
         if ($this->_force_charset) {
             $sql .= ' DEFAULT CHARSET=' . $this->_force_charset;
+        }
+
+        if ($this->_force_collation) {
+            $sql .= ' COLLATE=' . $this->_force_collation;
         }
 
         return !$this->query($sql)->error();
@@ -382,10 +482,11 @@ class DB {
     /**
      * Perform a SHOW TABLES LIKE query.
      *
-     * @param string $table Name of table to try and lookup.
+     * @param  string    $table Name of table to try and lookup.
      * @return int|false The number of rows affected, or false on failure.
      */
-    public function showTables(string $table) {
+    public function showTables(string $table)
+    {
         $table = $this->_prefix . $table;
         $sql = "SHOW TABLES LIKE '{$table}'";
 
@@ -399,12 +500,13 @@ class DB {
     /**
      * Add a new column to a table.
      *
-     * @param string $table Name of table to alter.
-     * @param string $column The column to add.
-     * @param string $attributes The attributes of the column.
-     * @return bool Whether an error occurred or not.
+     * @param  string $table      Name of table to alter.
+     * @param  string $column     The column to add.
+     * @param  string $attributes The attributes of the column.
+     * @return bool   Whether an error occurred or not.
      */
-    public function addColumn(string $table, string $column, string $attributes): bool {
+    public function addColumn(string $table, string $column, string $attributes): bool
+    {
         $table = $this->_prefix . $table;
         $sql = "ALTER TABLE {$table} ADD {$column} {$attributes}";
 
@@ -414,23 +516,24 @@ class DB {
     /**
      * Convert an array of where clause data into a MySQL WHERE clause and params.
      *
-     * @param array $clauses An array, or nested array, of
-     * column, operator (default =), value, and glue (default AND).
+     * @param  array $clauses An array, or nested array, of
+     *                        column, operator (default =), value, and glue (default AND).
      * @return array The where clause string, and parameters to bind.
      */
-    private function makeWhere(array $clauses): array {
+    public static function makeWhere(array $clauses): array
+    {
         if (count($clauses) === count($clauses, COUNT_RECURSIVE)) {
-            return $this->makeWhere([$clauses]);
+            return self::makeWhere([$clauses]);
         }
 
         $where_clauses = [];
         foreach ($clauses as $clause) {
             if (!is_array($clause)) {
-                continue;
+                throw new InvalidArgumentException('Where clause must be an array');
             }
 
             if (count($clause) !== count($clause, COUNT_RECURSIVE)) {
-                $this->makeWhere(...$clause);
+                self::makeWhere(...$clause);
                 continue;
             }
 

@@ -62,7 +62,15 @@ class Forum {
                 // Get discussion forums
                 $forums = $this->_db->query(
                     <<<SQL
-                        SELECT f.*
+                        SELECT
+                            f.*,
+                            EXISTS (
+                                SELECT p.ID
+                                FROM nl2_forums_permissions p
+                                WHERE p.group_id IN ($groups_in)
+                                  AND p.forum_id = f.id
+                                  AND p.view_other_topics = 1
+                            ) view_other_topics
                         FROM nl2_forums AS f
                         WHERE f.parent = ?
                           AND f.id IN 
@@ -88,7 +96,11 @@ class Forum {
                         // Get latest post from any sub-subforums
                         $subforums = $this->getAnySubforums($item->id, $groups, 0, true, $user_id);
 
-                        $latest_post = [$item->last_post_date, $item->last_user_posted, $item->last_topic_posted];
+                        if ($item->view_other_topics) {
+                            $latest_post = [$item->last_post_date, $item->last_user_posted, $item->last_topic_posted];
+                        } else {
+                            $latest_post = $this->getLatestPostInOwnTopicForum($item->id, $user_id);
+                        }
 
                         if (count($subforums)) {
                             $return[$forum->id]['subforums'][$item->id]->subforums = [];
@@ -480,23 +492,56 @@ class Forum {
     /**
      * Get the latest news posts to display on homepage.
      *
+     * TODO: can be optimised by including posts in the initial query?
+     *
      * @param int $number The number of posts to get.
+     * @param array $groups Array containing user's group IDs, default [0] for guests
      * @return array The latest news posts.
      */
-    public function getLatestNews(int $number = 5): array {
+    public function getLatestNews(int $number = 5, array $groups = [0]): array {
         $return = []; // Array to return containing news
         $labels_cache = []; // Array to contain labels
 
-        $news_items = $this->_db->query('SELECT * FROM nl2_topics WHERE forum_id IN (SELECT id FROM nl2_forums WHERE news = 1) AND deleted = 0 ORDER BY topic_date DESC LIMIT 10')->results();
+        $groups_in = implode(',', array_map(static fn () => '?', $groups));
+
+        $news_items = $this->_db->query(
+            <<<SQL
+                SELECT
+                    id,
+                    labels,
+                    topic_creator,
+                    topic_title,
+                    topic_views
+                FROM nl2_topics
+                WHERE
+                    forum_id IN (
+                        SELECT
+                            id
+                        FROM nl2_forums
+                        WHERE news = 1
+                        AND id IN (
+                            SELECT p.forum_id
+                            FROM nl2_forums_permissions p
+                            WHERE p.group_id IN ($groups_in)
+                            AND p.view = 1
+                        )
+                    )
+                    AND deleted = 0
+                ORDER BY topic_date
+                DESC LIMIT ?
+            SQL,
+            [...$groups, $number]
+        )->results();
 
         foreach ($news_items as $item) {
-            $news_post = $this->_db->get('posts', ['topic_id', $item->id])->results();
-            $posts = count($news_post);
+            $news_post = $this->_db->get('posts', ['topic_id', $item->id]);
+            $posts = $news_post->count();
+            $news_post = $news_post->first();
 
-            if (is_null($news_post[0]->created)) {
-                $post_date = date(DATE_FORMAT, strtotime($news_post[0]->post_date));
+            if (is_null($news_post->created)) {
+                $post_date = date(DATE_FORMAT, strtotime($news_post->post_date));
             } else {
-                $post_date = date(DATE_FORMAT, $news_post[0]->created);
+                $post_date = date(DATE_FORMAT, $news_post->created);
             }
 
             $labels = [];
@@ -533,7 +578,7 @@ class Forum {
                 }
             }
 
-            $post = $news_post[0]->post_content;
+            $post = $news_post->post_content;
             $return[] = [
                 'topic_id' => $item->id,
                 'topic_date' => $post_date,
@@ -547,12 +592,7 @@ class Forum {
             ];
         }
 
-        // Order the discussions by date - most recent first
-        usort($return, static function ($a, $b) {
-            return strtotime($b['topic_date']) - strtotime($a['topic_date']);
-        });
-
-        return array_slice($return, 0, $number, true);
+        return $return;
     }
 
     /**
@@ -705,41 +745,18 @@ class Forum {
 
         foreach ($subforums_query->results() as $result) {
             $to_add = new stdClass();
-            $to_add->id = Output::getClean($result->id);
+            $to_add->id = $result->id;
             $to_add->forum_title = Output::getClean($result->forum_title);
             $to_add->icon = Output::getPurified($result->icon);
             $to_add->category = false;
 
             // Latest post
-            if ($onlyOwnTopics && $result->view_other_topics != '1') {
-                // Get the latest topic that the user can view
-                $latest_post = $this->_db->query(
-                    <<<SQL
-                        SELECT
-                            p.topic_id,
-                            p.created,
-                            p.post_date,
-                            p.post_creator
-                        FROM nl2_topics t
-                            LEFT JOIN nl2_posts p
-                                ON p.id = (
-                                    SELECT id
-                                    FROM nl2_posts sp
-                                    WHERE sp.topic_id = t.id
-                                    AND sp.deleted = 0
-                                    ORDER BY sp.created DESC LIMIT 1
-                                )
-                        WHERE t.forum_id = ?
-                          AND (t.topic_creator = ? OR t.sticky = 1)
-                    SQL,
-                    [$result->id, $user_id]
-                );
-
-                if ($latest_post->count() && $latest_post = $latest_post->first()) {
-                    $to_add->last_post_date = $latest_post->created ?? strtotime($latest_post->post_date);
-                    $to_add->last_user_posted = $latest_post->post_creator;
-                    $to_add->last_topic_posted = $latest_post->topic_id;
-                }
+            if ($onlyOwnTopics && $result->view_other_topics !== 1) {
+                [
+                    $to_add->last_post_date,
+                    $to_add->last_user_posted,
+                    $to_add->last_topic_posted,
+                ] = $this->getLatestPostInOwnTopicForum($result->id, $user_id);
             } else {
                 $to_add->last_post_date = $result->last_post_date;
                 $to_add->last_user_posted = $result->last_user_posted;
@@ -748,7 +765,7 @@ class Forum {
 
             $ret[] = $to_add;
 
-            $subforums = $this->getAnySubforums($result->id, $groups, ++$depth);
+            $subforums = $this->getAnySubforums($result->id, $groups, ++$depth, $onlyOwnTopics, $user_id);
 
             if (count($subforums)) {
                 foreach ($subforums as $subforum) {
@@ -779,5 +796,63 @@ class Forum {
             }
             return $prev;
         }, []);
+    }
+
+    /**
+     * Get banned terms from the Forum module
+     *
+     * @return array Array of banned terms
+     */
+    public static function getBannedTerms(): array {
+        $terms = Settings::get('banned_terms', null, 'forum');
+
+        if (!$terms) {
+            return [];
+        }
+
+        return explode("\n", $terms);
+    }
+
+    /**
+     * Get the latest post in a "View own topic" forum
+     * This could be a topic created by the user, or a sticky topic
+     *
+     * @param int $forumId
+     * @param int $userId
+     * @return array|null Time of latest post, post creator ID, topic ID
+     */
+    private function getLatestPostInOwnTopicForum(int $forumId, int $userId): ?array {
+        $latest_post = $this->_db->query(
+            <<<SQL
+                SELECT
+                    p.topic_id,
+                    p.created,
+                    p.post_date,
+                    p.post_creator
+                FROM nl2_topics t
+                    LEFT JOIN nl2_posts p
+                        ON p.id = (
+                            SELECT id
+                            FROM nl2_posts sp
+                            WHERE sp.topic_id = t.id
+                            AND sp.deleted = 0
+                            ORDER BY sp.created DESC LIMIT 1
+                        )
+                WHERE t.forum_id = ?
+                  AND (t.topic_creator = ? OR t.sticky = 1)
+                ORDER BY p.created, p.post_date DESC LIMIT 1
+            SQL,
+            [$forumId, $userId]
+        );
+
+        if ($latest_post->count() && $latest_post = $latest_post->first()) {
+            return [
+                $latest_post->created ?? strtotime($latest_post->post_date),
+                $latest_post->post_creator,
+                $latest_post->topic_id,
+            ];
+        }
+
+        return null;
     }
 }

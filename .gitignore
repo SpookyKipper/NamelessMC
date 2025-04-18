@@ -1,3 +1,4 @@
+/.fleet/
 /.idea/
 /core/config.php
 /cache
@@ -8,7 +9,9 @@
 /vendor
 /core/assets/vendor
 /uploads/avatars/**
+/uploads/logos/**
 /node_modules/
 composer.lock
+checksums.json
 /.node_cache/
 /release/

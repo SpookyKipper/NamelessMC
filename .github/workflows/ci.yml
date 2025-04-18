@@ -8,12 +8,12 @@ jobs:
     strategy:
       matrix:
         operating-system: ["ubuntu-latest"]
-        php-versions: ["7.4", "8.0", "8.1", "8.2"]
+        php-versions: ["7.4", "8.0", "8.1", "8.2", "8.3", "8.4"]
     steps:
       - uses: actions/checkout@v2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.16.0
+        uses: shivammathur/setup-php@2.24.0
         with:
           php-version: ${{ matrix.php-versions }}
 
@@ -21,17 +21,7 @@ jobs:
         run: composer update --no-interaction --no-suggest --no-progress
 
       - name: Execute PHPStan
-        run: vendor/bin/phpstan
-
-  code-style:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: PHP Code Style (phpcs)
-        uses: chindit/actions-phpcs@master
-        with:
-          cli: "-q"
+        run: vendor/bin/phpstan --configuration=dev/phpstan.neon
 
   unused-language-term-check:
     runs-on: ubuntu-latest

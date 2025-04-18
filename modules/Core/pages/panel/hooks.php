@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr9
+/**
+ * Staff panel hooks page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel hooks page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.core.hooks')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,7 +27,7 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'core_configuration';
 const PANEL_PAGE = 'hooks';
 $page_title = $language->get('admin', 'hooks');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 if (!isset($_GET['action'])) {
     // View all hooks
@@ -36,7 +45,7 @@ if (!isset($_GET['action'])) {
         }
     }
 
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'HOOKS_INFO' => $language->get('admin', 'hooks_info'),
         'NEW_HOOK' => $language->get('admin', 'new_hook'),
         'NEW_HOOK_LINK' => URL::build('/panel/core/hooks/', 'action=new'),
@@ -47,7 +56,7 @@ if (!isset($_GET['action'])) {
         'NO' => $language->get('general', 'no')
     ]);
 
-    $template_file = 'core/hooks.tpl';
+    $template_file = 'core/hooks';
 } else {
     switch ($_GET['action']) {
         case 'new':
@@ -106,7 +115,7 @@ if (!isset($_GET['action'])) {
                 }
             }
 
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'CREATING_NEW_HOOK' => $language->get('admin', 'creating_new_hook'),
                 'HOOK_NAME' => $language->get('admin', 'hook_name'),
                 'HOOK_URL' => $language->get('admin', 'hook_url'),
@@ -114,11 +123,14 @@ if (!isset($_GET['action'])) {
                 'HOOK_EVENTS' => $language->get('admin', 'hook_events'),
                 'BACK' => $language->get('general', 'back'),
                 'BACK_LINK' => URL::build('/panel/core/hooks'),
+                'DISCORD' => $language->get('admin', 'discord_hook'),
                 'NORMAL' => $language->get('general', 'normal'),
                 'ALL_EVENTS' => EventHandler::getEvents(),
+                'SUPPORTS_DISCORD' => $language->get('admin', 'event_supports_discord'),
+                'SUPPORTS_NORMAL' => $language->get('admin', 'event_supports_normal'),
             ]);
 
-            $template_file = 'core/hooks_new.tpl';
+            $template_file = 'core/hooks_new';
             break;
 
         case 'edit':
@@ -189,7 +201,7 @@ if (!isset($_GET['action'])) {
                 }
             }
 
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'EDITING_HOOK' => $language->get('admin', 'editing_hook'),
                 'HOOK_NAME' => $language->get('admin', 'hook_name'),
                 'HOOK_NAME_VALUE' => Output::getClean($hook->name),
@@ -200,12 +212,15 @@ if (!isset($_GET['action'])) {
                 'HOOK_EVENTS' => $language->get('admin', 'hook_events'),
                 'BACK' => $language->get('general', 'back'),
                 'BACK_LINK' => URL::build('/panel/core/hooks'),
+                'DISCORD' => $language->get('admin', 'discord_hook'),
                 'NORMAL' => $language->get('general', 'normal'),
                 'ALL_EVENTS' => EventHandler::getEvents(),
-                'ENABLED_HOOKS' => json_decode($hook->events, true)
+                'ENABLED_HOOKS' => json_decode($hook->events, true),
+                'SUPPORTS_DISCORD' => $language->get('admin', 'event_supports_discord'),
+                'SUPPORTS_NORMAL' => $language->get('admin', 'event_supports_normal'),
             ]);
 
-            $template_file = 'core/hooks_edit.tpl';
+            $template_file = 'core/hooks_edit';
             break;
 
         case 'delete':
@@ -246,20 +261,20 @@ if (Session::exists('admin_hooks_error')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'NO_HOOKS' => $language->get('admin', 'no_hooks_yet'),
     'NAME' => $language->get('admin', 'name'),
     'LINK' => $language->get('general', 'url'),
@@ -275,7 +290,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate($template_file, $smarty);
+$template->displayTemplate($template_file);

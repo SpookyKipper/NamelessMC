@@ -1,12 +1,21 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr12
+/**
+ * Login page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Login page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 // Set page name variable
@@ -20,8 +29,7 @@ if ($user->isLoggedIn()) {
 }
 
 // Get login method
-$login_method = DB::getInstance()->get('settings', ['name', 'login_method'])->results();
-$login_method = $login_method[0]->value;
+$login_method = Settings::get('login_method');
 
 $captcha = CaptchaBase::isCaptchaEnabled('recaptcha_login');
 
@@ -161,7 +169,7 @@ if (Input::exists()) {
                         // Sync AuthMe password
                         $authme_db = Config::get('authme');
 
-                        if (Util::getSetting('mc_integration') && Util::getSetting('authme') && DB::getInstance()->get('users', ['id', $user_id])->first()->authme_sync_password) {
+                        if (Settings::get('mc_integration') && Settings::get('authme') && DB::getInstance()->get('users', ['id', $user_id])->first()->authme_sync_password) {
                             try {
                                 // Check user exists in database and validate password
                                 $authme_conn = DB::getCustomInstance($authme_db['address'], $authme_db['db'], $authme_db['user'], $authme_db['pass'], $authme_db['port']);
@@ -232,6 +240,11 @@ if (Input::exists()) {
             } else {
                 // Validation failed
                 $return_error = $validation->errors();
+
+                // If the account is banned, update the validation to only show this, and no others
+                if (in_array($language->get('user', 'account_banned'), $return_error)) {
+                    $return_error = [$language->get('user', 'account_banned')];
+                }
             }
         } else {
             // reCAPTCHA failed
@@ -249,16 +262,28 @@ Session::put('oauth_method', 'login');
 // Sign in template
 // Generate content
 if ($login_method == 'email') {
-    $smarty->assign('EMAIL', $language->get('user', 'email'));
+    $template->getEngine()->addVariable('EMAIL', $language->get('user', 'email'));
 } else if ($login_method == 'email_or_username') {
-    $smarty->assign('USERNAME', $language->get('user', 'email_or_username'));
-} else if (Util::getSetting('mc_integration')) {
-    $smarty->assign('USERNAME', $language->get('user', 'minecraft_username'));
+    $template->getEngine()->addVariable('USERNAME', $language->get('user', 'email_or_username'));
+} else if (Settings::get('mc_integration')) {
+    $template->getEngine()->addVariable('USERNAME', $language->get('user', 'minecraft_username'));
 } else {
-    $smarty->assign('USERNAME', $language->get('user', 'username'));
+    $template->getEngine()->addVariable('USERNAME', $language->get('user', 'username'));
 }
 
-$smarty->assign([
+// Add "login with..." message to provider array
+$providers = [];
+foreach (NamelessOAuth::getInstance()->getProvidersAvailable() as $name => $provider) {
+    if (!NamelessOAuth::getInstance()->isEnabled($name))
+        continue;
+
+    $providers[$name] = $provider;
+    $providers[$name]['log_in_with'] = $language->get('user', 'log_in_with', [
+        'provider' => Output::getClean($provider['display_name'])
+    ]);
+}
+
+$template->getEngine()->addVariables([
     'USERNAME_INPUT' => ($login_method == 'email' ? Output::getClean(Input::get('email')) : Output::getClean(Input::get('username'))),
     'PASSWORD' => $language->get('user', 'password'),
     'REMEMBER_ME' => $language->get('user', 'remember_me'),
@@ -271,23 +296,23 @@ $smarty->assign([
     'ERROR_TITLE' => $language->get('general', 'error'),
     'ERROR' => ($return_error ?? []),
     'NOT_REGISTERED_YET' => $language->get('general', 'not_registered_yet'),
-    'OAUTH_AVAILABLE' => NamelessOAuth::getInstance()->isAvailable(),
-    'OAUTH_PROVIDERS' => NamelessOAuth::getInstance()->getProvidersAvailable(),
+    'OAUTH_AVAILABLE' => count($providers),
+    'OAUTH_PROVIDERS' => $providers,
     'OR' => $language->get('general', 'or'),
 ]);
 
 if (Session::exists('oauth_error')) {
-    $smarty->assign('ERROR', [Session::flash('oauth_error')]);
+    $template->getEngine()->addVariable('ERROR', [Session::flash('oauth_error')]);
 } else if (isset($return_error)) {
-    $smarty->assign('ERROR', $return_error);
+    $template->getEngine()->addVariable('ERROR', $return_error);
 }
 
 if (Session::exists('login_success')) {
-    $smarty->assign('SUCCESS', Session::flash('login_success'));
+    $template->getEngine()->addVariable('SUCCESS', Session::flash('login_success'));
 }
 
 if ($captcha) {
-    $smarty->assign('CAPTCHA', CaptchaBase::getActiveProvider()->getHtml());
+    $template->getEngine()->addVariable('CAPTCHA', CaptchaBase::getActiveProvider()->getHtml());
     $template->addJSFiles([CaptchaBase::getActiveProvider()->getJavascriptSource() => []]);
 
     $submitScript = CaptchaBase::getActiveProvider()->getJavascriptSubmit('form-login');
@@ -306,8 +331,8 @@ Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/navbar.php');
-require(ROOT_PATH . '/core/templates/footer.php');
+require ROOT_PATH . '/core/templates/navbar.php';
+require ROOT_PATH . '/core/templates/footer.php';
 
 // Display template
-$template->displayTemplate('login.tpl', $smarty);
+$template->displayTemplate('login');

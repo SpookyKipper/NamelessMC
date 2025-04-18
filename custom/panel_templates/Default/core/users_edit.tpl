@@ -43,7 +43,7 @@
                                 <div class="col-md-3">
                                     <span class="float-md-right">
                                         {if isset($DELETE_USER) || isset($RESEND_ACTIVATION_EMAIL) ||
-                                        isset($VALIDATE_USER)}
+                                        isset($VALIDATE_USER) || isset($DISABLE_TFA)}
                                         <div class="btn-group">
                                             <button type="button" class="btn btn-primary dropdown-toggle"
                                                 data-toggle="dropdown" aria-haspopup="true"
@@ -57,6 +57,8 @@
                                                     onclick="validateUser()">{$VALIDATE_USER}</a>{/if}
                                                 {if isset($CHANGE_PASSWORD)}<a class="dropdown-item" href="#"
                                                     onclick="changePassword()">{$CHANGE_PASSWORD}</a> {/if}
+                                                {if isset($DISABLE_TFA)}<a class="dropdown-item" href="#"
+                                                    onclick="disableTfa()">{$DISABLE_TFA}</a> {/if}
                                             </div>
                                         </div>
                                         {/if}
@@ -90,13 +92,13 @@
                                         placeholder="{$USERNAME}" value="{$USERNAME_VALUE}">
                                 </div>
                                 {if $DISPLAYNAMES eq true}
-                                <div class="form-group">
-                                    <label for="InputUsername">{$NICKNAME}</label>
-                                    <input type="text" name="nickname" class="form-control" id="InputUsername"
-                                        placeholder="{$NICKNAME}" value="{$NICKNAME_VALUE}">
-                                </div>
+                                    <div class="form-group">
+                                        <label for="InputUsername">{$NICKNAME}</label>
+                                        <input type="text" name="nickname" class="form-control" id="InputUsername"
+                                            placeholder="{$NICKNAME}" value="{$NICKNAME_VALUE}">
+                                    </div>
                                 {else}
-                                <input type="hidden" name="nickname" value="{$NICKNAME_VALUE}">
+                                    <input type="hidden" name="nickname" value="{$NICKNAME_VALUE}">
                                 {/if}
                                 <div class="form-group">
                                     <label for="InputEmail">{$EMAIL_ADDRESS}</label>
@@ -109,18 +111,38 @@
                                         placeholder="{$USER_TITLE}" value="{$USER_TITLE_VALUE}">
                                 </div>
                                 {if $PRIVATE_PROFILE_ENABLED eq true}
+                                    <div class="form-group">
+                                        <label for="inputPrivateProfile">{$PRIVATE_PROFILE}</label>
+                                        <select name="privateProfile" class="form-control" id="inputPrivateProfile">
+                                            <option value="1" {if $PRIVATE_PROFILE_VALUE eq 1} selected{/if}>{$ENABLED}
+                                            </option>
+                                            <option value="0" {if $PRIVATE_PROFILE_VALUE eq 0} selected{/if}>{$DISABLED}
+                                            </option>
+                                        </select>
+                                    </div>
+                                {else}
+                                    <input type="hidden" name="privateProfile" value="0">
+                                {/if}
                                 <div class="form-group">
-                                    <label for="inputPrivateProfile">{$PRIVATE_PROFILE}</label>
-                                    <select name="privateProfile" class="form-control" id="inputPrivateProfile">
-                                        <option value="1" {if $PRIVATE_PROFILE_VALUE eq 1} selected{/if}>{$ENABLED}
-                                        </option>
-                                        <option value="0" {if $PRIVATE_PROFILE_VALUE eq 0} selected{/if}>{$DISABLED}
-                                        </option>
+                                    <label for="inputLanguage">{$LANGUAGE}</label>
+                                    <select name="language" class="form-control" id="inputLanguage">
+                                        {foreach from=$LANGUAGES item=language}
+                                            <option value="{$language.id}" {if $language.active} selected{/if}>
+                                                {$language.name}
+                                            </option>
+                                        {/foreach}
                                     </select>
                                 </div>
-                                {else}
-                                <input type="hidden" name="privateProfile" value="0">
-                                {/if}
+                                <div class="form-group">
+                                    <label for="inputTimezone">{$TIMEZONE}</label>
+                                    <select name="timezone" class="form-control" id="inputTimezone">
+                                        {foreach from=$TIMEZONES key=KEY item=ITEM}
+                                            <option value="{$KEY}" {if $TIMEZONE_VALUE eq $KEY} selected{/if}>
+                                                ({$ITEM.offset}) {$ITEM.name} &middot; ({$ITEM.time})
+                                            </option>
+                                        {/foreach}
+                                    </select>
+                                </div>
                                 <div class="form-group">
                                     <label for="inputTemplate">{$ACTIVE_TEMPLATE}</label>
                                     <select name="template" class="form-control" id="inputTemplate">
@@ -240,6 +262,10 @@
     <form style="display:none" action="{$VALIDATE_USER_LINK}" method="post" id="validateUserForm">
         <input type="hidden" name="token" value="{$TOKEN}" />
     </form>
+    <form style="display:none" action="{$DISABLE_TFA_LINK}" method="post" id="disableTfaForm">
+        <input type="hidden" name="token" value="{$TOKEN}" />
+    </form>
+
 
     {include file='scripts.tpl'}
 
@@ -249,7 +275,7 @@
                 $('#deleteModal').modal().show();
             }
         {/if}
-    
+
         {if isset($VALIDATE_USER)}
             function validateUser() {
                 $('#validateUserForm').submit();
@@ -261,7 +287,13 @@
                 $('#passwordModal').modal().show();
             }
         {/if}
-    
+
+        {if isset($DISABLE_TFA)}
+            function disableTfa() {
+                $('#disableTfaForm').submit();
+            }
+        {/if}
+
         $(document).ready(() => {
             $('#inputGroups').select2({ placeholder: "{$NO_ITEM_SELECTED}" });
         })
