@@ -21,11 +21,6 @@ class Email
     public const MASS_MESSAGE = 6;
 
     /**
-     * @var array<string, string> Placeholders for email templates
-     */
-    private static array $_message_placeholders = [];
-
-    /**
      * Send an email.
      *
      * @param  array      $recipient Array containing `'email'` and `'name'` strings for the recipient of the email.
@@ -106,7 +101,6 @@ class Email
     private static function sendMailer(array $email)
     {
         try {
-            // Initialise PHPMailer
             $mail = new PHPMailer(true);
 
             $mail->IsSMTP();
@@ -153,43 +147,5 @@ class Email
                 'error' => $e->getMessage(),
             ];
         }
-    }
-
-    /**
-     * Add a custom placeholder/variable for email messages.
-     *
-     * @param string                                   $key   The key to use for the placeholder, should be enclosed in square brackets.
-     * @param string|Closure(Language, string): string $value The value to replace the placeholder with.
-     */
-    public static function addPlaceholder(string $key, $value): void
-    {
-        self::$_message_placeholders[$key] = $value;
-    }
-
-    /**
-     * Format an email template and replace placeholders.
-     *
-     * @param  string   $email            Name of email to format.
-     * @param  Language $viewing_language Instance of Language class to use for translations.
-     * @return string   Formatted email.
-     */
-    public static function formatEmail(string $email, Language $viewing_language): string
-    {
-        $placeholders = array_keys(self::$_message_placeholders);
-
-        $placeholder_values = [];
-        foreach (self::$_message_placeholders as $value) {
-            if (is_callable($value)) {
-                $placeholder_values[] = $value($viewing_language, $email);
-            } else {
-                $placeholder_values[] = $value;
-            }
-        }
-
-        return str_replace(
-            $placeholders,
-            $placeholder_values,
-            file_get_contents(implode(DIRECTORY_SEPARATOR, [ROOT_PATH, 'custom', 'templates', TEMPLATE, 'email', $email . '.html']))
-        );
     }
 }

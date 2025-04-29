@@ -16,6 +16,7 @@ class Notification {
     private bool $_skipPurify;
     private string $_type;
     private ?string $_alertUrl = null;
+    private EmailTemplate $_emailTemplate;
 
     private static array $_types = [];
 
@@ -42,6 +43,7 @@ class Notification {
         ?callable $contentCallback = null,
         bool $skipPurify = false,
         ?string $alertUrl = null,
+        EmailTemplate $emailTemplate,
     ) {
         if (!in_array($type, array_column(self::getTypes(), 'key'))) {
             throw new NotificationTypeNotFoundException("Type $type not registered");
@@ -51,6 +53,7 @@ class Notification {
         $this->_skipPurify = $skipPurify;
         $this->_type = $type;
         $this->_alertUrl = $alertUrl;
+        $this->_emailTemplate = $emailTemplate;
 
         if (!is_array($recipients)) {
             $recipients = [$recipients];
@@ -124,7 +127,7 @@ class Notification {
             Module::getIdFromName('Core'),
             'Send Email Notification',
             [
-                'content' => $content,
+                'content' => $this->_emailTemplate->render($content),
                 'title' => $title,
             ],
             date('U'), // TODO: schedule a date/time?
