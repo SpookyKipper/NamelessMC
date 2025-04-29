@@ -140,6 +140,7 @@ class Forum_Module extends Module {
 
         EventHandler::registerListener('renderPostEdit', 'ContentHook::purify');
         EventHandler::registerListener('renderPostEdit', 'ContentHook::replaceAnchors', 15);
+        EventHandler::registerListener('renderPostEdit', 'MentionsHook::stripPost', 5);
 
         if (Util::isModuleEnabled('Members')) {
             MemberListManager::getInstance()->registerListProvider(new MostPostsMemberListProvider($forum_language));
@@ -167,6 +168,20 @@ class Forum_Module extends Module {
         }
 
         ReactionContextsManager::getInstance()->provideContext(new ForumPostReactionContext($forum_language));
+
+        Notification::addType(
+            'forum_topic_reply',
+            $forum_language->get('forum', 'forum_topic_replies'),
+            Module::getIdFromName('Forum'),
+            ['alert' => true, 'email' => true],
+        );
+
+        Notification::addType(
+            'forum_topic_mention',
+            $forum_language->get('forum', 'forum_topic_mentions'),
+            Module::getIdFromName('Forum'),
+            ['alert' => true, 'email' => true],
+        );
     }
 
     public function onInstall() {
