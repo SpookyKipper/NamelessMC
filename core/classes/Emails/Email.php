@@ -22,6 +22,36 @@ class Email
     public const FORUM_TOPIC_REPLY = 5;
     public const MASS_MESSAGE = 6;
 
+    public static function sendNext(User $recipient, EmailTemplate $emailTemplate)
+    {
+        $languageCode = DB::getInstance()->get('languages', ['id', '=', $recipient->data()->language_id])->first()->short_code;
+
+        $email = [
+            'to' => [
+                'email' => $recipient->data()->email,
+                'name' => $recipient->getDisplayname(),
+            ],
+            'subject' => SITE_NAME . ' - ' . $emailTemplate->subject()->translate($languageCode),
+            'message' => $emailTemplate->renderContent($languageCode),
+            'replyto' => self::getReplyTo(),
+        ];
+
+        $result = Settings::get('phpmailer') == '1'
+            ? self::sendMailer($email)
+            : self::sendPHP($email);
+
+        if (isset($result['error'])) {
+            DB::getInstance()->insert('email_errors', [
+                'type' => $emailTemplate->id(),
+                'content' => $result['error'],
+                'at' => date('U'),
+                'user_id' => $recipient->data()->id,
+            ]);
+        }
+
+        return $result;
+    }
+
     /**
      * Send an email.
      *
@@ -107,7 +137,6 @@ class Email
 
             $mail->IsSMTP();
             $mail->SMTPDebug = SMTP::DEBUG_OFF;
-            $mail->Debugoutput = 'html';
             $mail->CharSet = PHPMailer::CHARSET_UTF8;
             $mail->Encoding = PHPMailer::ENCODING_BASE64;
             $mail->Timeout = 15;

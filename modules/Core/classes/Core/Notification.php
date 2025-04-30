@@ -131,8 +131,7 @@ class Notification {
             Module::getIdFromName('Core'),
             'Send Email Notification',
             [
-                'content' => $this->_emailTemplate->render($content),
-                'title' => SITE_NAME . ' - ' . $title,
+                'email_template' => $this->_emailTemplate,
             ],
             date('U'), // TODO: schedule a date/time?
             'User',

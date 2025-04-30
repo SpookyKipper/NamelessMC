@@ -546,11 +546,6 @@ class Core_Module extends Module {
 
         EventHandler::registerListener(UserRegisteredEvent::class, DefaultUserNotificationPreferencesHook::class);
 
-        Email::addPlaceholder('[Sitename]', Output::getClean(SITE_NAME));
-        Email::addPlaceholder('[Greeting]', static fn(Language $viewing_language) => $viewing_language->get('emails', 'greeting'));
-        Email::addPlaceholder('[Message]', static fn(Language $viewing_language, string $email) => $viewing_language->get('emails', $email . '_message'));
-        Email::addPlaceholder('[Thanks]', static fn(Language $viewing_language) => $viewing_language->get('emails', 'thanks'));
-
         if (Util::isModuleEnabled('Members')) {
             MemberListManager::getInstance()->registerListProvider(new RegisteredMembersListProvider($language));
             MemberListManager::getInstance()->registerListProvider(new StaffMembersListProvider($language));
