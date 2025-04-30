@@ -59,8 +59,6 @@ abstract class EmailTemplate
 
     final public function renderContent(string $languageCode): string
     {
-        $language = new Language($this->moduleLanguagePath(), $languageCode);
-
         $allPlaceholders = array_merge(self::$_global_placeholders, $this->_placeholders);
         $placeholderKeys = array_keys($allPlaceholders);
         $placeholderValues = [];
@@ -68,8 +66,6 @@ abstract class EmailTemplate
         foreach ($allPlaceholders as $placeholder) {
             if ($placeholder instanceof LanguageKey) {
                 $placeholderValues[] = $placeholder->translate($languageCode);
-            } else if (is_callable($placeholder)) {
-                $placeholderValues[] = $placeholder($language, $this->name());
             } else {
                 $placeholderValues[] = $placeholder;
             }
@@ -97,15 +93,5 @@ abstract class EmailTemplate
         }
 
         throw new Exception('Email template not found: ' . $name);
-    }
-
-    private function moduleLanguagePath(): string
-    {
-        $reflection = new ReflectionClass($this);
-        $filePath = $reflection->getFileName();
-
-        preg_match('#modules/([^/]+)/#', $filePath, $matches);
-
-        return 'modules/' . $matches[1] . '/language';
     }
 }

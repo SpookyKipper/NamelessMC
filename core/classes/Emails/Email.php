@@ -18,7 +18,6 @@ class Email
 
     public const REGISTRATION = 1;
     public const FORGOT_PASSWORD = 3;
-    public const API_REGISTRATION = 4;
     public const FORUM_TOPIC_REPLY = 5;
     public const MASS_MESSAGE = 6;
     public const TEST_EMAIL = 7;
@@ -56,27 +55,37 @@ class Email
     /**
      * Send an email.
      *
-     * @param  array      $recipient Array containing `'email'` and `'name'` strings for the recipient of the email.
+     * @param  User      $recipient Array containing `'email'` and `'name'` strings for the recipient of the email.
      * @param  string     $subject   Subject of the email.
      * @param  string     $message   Message of the email.
-     * @param  array|null $reply_to  Array containing `'email'` and `'name'` strings for the reply-to address,
-     *                               if not provided the default setting will be used.
      * @return bool|array Returns true if email sent, otherwise returns an array containing the error.
      */
-    public static function send(array $recipient, string $subject, string $message, ?array $reply_to = null)
+    public static function sendRaw(int $type, User $recipient, string $subject, string $content)
     {
         $email = [
-            'to' => $recipient,
-            'subject' => $subject,
-            'message' => $message,
-            'replyto' => $reply_to ?? self::getReplyTo(),
+            'to' => [
+                'email' => $recipient->data()->email,
+                'name' => $recipient->getDisplayname(),
+            ],
+            'subject' => SITE_NAME . ' - ' . $subject,
+            'message' => $content,
+            'replyto' => self::getReplyTo(),
         ];
 
-        if (Settings::get('phpmailer') == '1') {
-            return self::sendMailer($email);
+        $result = Settings::get('phpmailer') == '1'
+            ? self::sendMailer($email)
+            : self::sendPHP($email);
+
+        if (isset($result['error'])) {
+            DB::getInstance()->insert('email_errors', [
+                'type' => $type,
+                'content' => $result['error'],
+                'at' => date('U'),
+                'user_id' => $recipient->data()->id,
+            ]);
         }
 
-        return self::sendPHP($email);
+        return $result;
     }
 
     /**

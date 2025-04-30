@@ -23,9 +23,9 @@ class MentionsHook extends HookBase {
             $params['content'] = MentionsParser::parseAndNotify(
                 $params['user']->data()->id,
                 $params['content'],
-                $params['alert_url'],
                 $params['mention_notification_type'],
-                $params['mention_notification_title'],
+                $params['mention_notification_alert_template'],
+                $params['mention_notification_email_template'],
             );
         }
 

@@ -11,12 +11,11 @@
 
 class Notification {
 
+    private AlertTemplate $_alertTemplate;
+    private EmailTemplate $_emailTemplate;
     private int $_authorId;
     private array $_recipients = [];
-    private bool $_skipPurify;
     private string $_type;
-    private ?string $_alertUrl = null;
-    private EmailTemplate $_emailTemplate;
 
     private static array $_types = [];
 
@@ -36,24 +35,19 @@ class Notification {
      */
     public function __construct(
         string $type,
-        string|LanguageKey $title,
-        string|LanguageKey $content,
+        AlertTemplate $alertTemplate,
+        EmailTemplate $emailTemplate,
         int|array $recipients,
         int $authorId,
-        ?callable $contentCallback = null,
-        bool $skipPurify = false,
-        ?string $alertUrl = null,
-        EmailTemplate $emailTemplate,
     ) {
         if (!in_array($type, array_column(self::getTypes(), 'key'))) {
             throw new NotificationTypeNotFoundException("Type $type not registered");
         }
 
-        $this->_authorId = $authorId;
-        $this->_skipPurify = $skipPurify;
         $this->_type = $type;
-        $this->_alertUrl = $alertUrl;
+        $this->_alertTemplate = $alertTemplate;
         $this->_emailTemplate = $emailTemplate;
+        $this->_authorId = $authorId;
 
         if (!is_array($recipients)) {
             $recipients = [$recipients];
@@ -63,29 +57,16 @@ class Notification {
             return;
         }
 
-        if ($title instanceof LanguageKey || $content instanceof LanguageKey) {
-            $languageCodes = DB::getInstance()->query(
-                'SELECT nl2_users.id, COALESCE(nl2_languages.short_code, NULL) AS `short_code` FROM nl2_users LEFT JOIN nl2_languages ON nl2_languages.id = nl2_users.language_id WHERE nl2_users.id IN (' . implode(',', array_map(static fn ($_) => '?', $recipients)) . ')',
-                $recipients
-            )->results();
-            $languageCodes = array_column($languageCodes, 'short_code', 'id');
-        }
+        $languageCodes = DB::getInstance()->query(
+            'SELECT nl2_users.id, COALESCE(nl2_languages.short_code, NULL) AS `short_code` FROM nl2_users LEFT JOIN nl2_languages ON nl2_languages.id = nl2_users.language_id WHERE nl2_users.id IN (' . implode(',', array_map(static fn ($_) => '?', $recipients)) . ')',
+            $recipients
+        )->results();
+        $languageCodes = array_column($languageCodes, 'short_code', 'id');
 
-        $this->_recipients = array_map(static function ($recipientId) use ($content, $contentCallback, $skipPurify, $title, $languageCodes) {
-            $recipientLanguageCode = $languageCodes[$recipientId] ?? DEFAULT_LANGUAGE;
-            if ($title instanceof LanguageKey) {
-                $title = $title->translate($recipientLanguageCode);
-            }
-            if ($content instanceof LanguageKey) {
-                $content = $content->translate($recipientLanguageCode);
-            }
-
-            $newContent = $contentCallback ? $contentCallback($recipientId, $title, $content, $skipPurify) : $content;
-
+        $this->_recipients = array_map(static function ($recipientId) use ($languageCodes) {
             return [
                 'id' => $recipientId,
-                'title' => $title,
-                'content' => $newContent
+                'language_code' => $languageCodes[$recipientId] ?? DEFAULT_LANGUAGE,
             ];
         }, $recipients);
     }
@@ -93,9 +74,8 @@ class Notification {
     public function send(): void {
         /** @var array $recipient */
         foreach ($this->_recipients as $recipient) {
-            $id = $recipient['id'];
-            $title = $recipient['title'];
-            $content = $recipient['content'];
+            $userId = $recipient['id'];
+            $languageCode = $recipient['language_code'];
 
             $preferences = DB::getInstance()->query(
                 <<<SQL
@@ -103,35 +83,35 @@ class Notification {
                     FROM nl2_users_notification_preferences
                     WHERE `type` = ? AND `user_id` = ?
                 SQL,
-                [$this->_type, $id]
+                [$this->_type, $userId]
             )->first();
 
             if ($preferences->alert) {
-                $this->sendAlert($id, $title, $content);
+                $this->sendAlert($userId, $languageCode);
             }
             if ($preferences->email) {
-                $this->sendEmail($id, $title, $content);
+                $this->sendEmail($userId, $languageCode);
             }
         }
     }
 
-    private function sendAlert(int $userId, string $title, string $content): void {
+    private function sendAlert(int $userId, string $languageCode): void {
         Alert::send(
             $userId,
-            $title,
-            // if $this->_alertUrl is set, we don't want to send the content as the alert content
-            $this->_alertUrl ? null : $content,
-            $this->_alertUrl,
-            $this->_skipPurify
+            $this->_alertTemplate->title->translate($languageCode),
+            // if the alert has a link set, we don't want to send the content as the alert content
+            $this->_alertTemplate->link ? null : $this->_alertTemplate->content->translate($languageCode),
+            $this->_alertTemplate->link,
         );
     }
 
-    private function sendEmail(int $userId, string $title, string $content): void {
+    private function sendEmail(int $userId, string $languageCode): void {
         $task = (new SendEmail())->fromNew(
             Module::getIdFromName('Core'),
             'Send Email Notification',
             [
-                'email_template' => $this->_emailTemplate,
+                'subject' => $this->_emailTemplate->subject()->translate($languageCode),
+                'content' => $this->_emailTemplate->renderContent($languageCode),
             ],
             date('U'), // TODO: schedule a date/time?
             'User',

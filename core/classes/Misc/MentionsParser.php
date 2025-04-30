@@ -37,7 +37,7 @@ class MentionsParser
      *
      * @return string Parsed post content.
      */
-    public static function parseAndNotify(int $author_id, string $content, string $url, string $notificationType, LanguageKey $notificationTitle): string
+    public static function parseAndNotify(int $author_id, string $content, string $notificationType, AlertTemplate $notificationAlertTemplate, EmailTemplate $notificationEmailTemplate): string
     {
         $receipients = self::getRecipients($content, $author_id);
 
@@ -46,14 +46,10 @@ class MentionsParser
 
         $notification = new Notification(
             $notificationType,
-            $notificationTitle,
-            // TODO: emails content - right now it will be plaintext and not use a template
-            $content,
+            $notificationAlertTemplate,
+            $notificationEmailTemplate,
             $notificationRecipients,
             $author_id,
-            null,
-            false,
-            $url,
         );
 
         $notification->send();
@@ -68,6 +64,10 @@ class MentionsParser
     {
         preg_match_all(self::USER_MENTIONS_REGEX, $content, $matches);
         $nicknames = $matches[1];
+
+        if (empty($nicknames)) {
+            return [];
+        }
 
         return DB::getInstance()->query(
             'SELECT u.id, u.nickname, EXISTS (SELECT 1 FROM nl2_blocked_users bu WHERE bu.user_id = u.id AND bu.user_blocked_id = ?) as blocked_author FROM nl2_users u WHERE u.nickname IN (' . implode(',', array_map(static fn ($_) => '?', $nicknames)) . ')',
