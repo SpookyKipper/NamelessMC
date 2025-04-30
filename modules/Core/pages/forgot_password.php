@@ -54,22 +54,12 @@ if (empty($_GET['c'])) {
                     $code = SecureRandom::alphanumeric();
 
                     // Send an email
-                    $link = rtrim(URL::getSelfURL(), '/') . URL::build('/forgot_password/', 'c=' . urlencode($code));
-
-                    $sent = Email::send(
-                        ['email' => $target_user->data()->email, 'name' => $target_user->getDisplayname()],
-                        SITE_NAME . ' - ' . $language->get('emails', 'change_password_subject'),
-                        str_replace('[Link]', $link, Email::formatEmail('change_password', $language)),
+                    $sent = Email::sendNext(
+                        $target_user,
+                        new ForgotPasswordEmailTemplate($code),
                     );
 
                     if (isset($sent['error'])) {
-                        DB::getInstance()->insert('email_errors', [
-                            'type' => Email::FORGOT_PASSWORD,
-                            'content' => $sent['error'],
-                            'at' => date('U'),
-                            'user_id' => $target_user->data()->id
-                        ]);
-
                         $error = $language->get('user', 'unable_to_send_forgot_password_email');
                     }
 
