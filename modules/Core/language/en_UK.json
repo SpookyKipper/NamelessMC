@@ -812,8 +812,6 @@
     "emails/greeting": "Hi,",
     "emails/register_message": "Thanks for registering! In order to complete your registration, please click the following link:",
     "emails/register_subject": "Validate Account",
-    "emails/test_subject": "Test email",
-    "emails/test_message": "Test email successful!",
     "emails/thanks": "Thanks,",
     "errors/403_back": "Go back",
     "errors/403_content": "You do not have permission to view this page.",

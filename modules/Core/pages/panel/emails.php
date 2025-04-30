@@ -55,9 +55,11 @@ if (isset($_GET['action'])) {
         if (isset($_GET['do']) && $_GET['do'] == 'send') {
             $errors = [];
 
-            $sent = Email::sendNext(
+            $sent = Email::sendRaw(
+                Email::TEST_EMAIL,
                 $user,
-                new TestEmailTemplate,
+                'Test Email',
+                Output::getClean(SITE_NAME) . ' - Test email successful!'
             );
 
             if (isset($sent['error'])) {
