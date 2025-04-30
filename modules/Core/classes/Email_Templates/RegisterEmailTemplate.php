@@ -6,7 +6,8 @@ class RegisterEmailTemplate extends EmailTemplate
 
     public function __construct(string $code)
     {
-        $link = URL::getSelfURL() . ltrim(URL::build('/complete_signup/', 'c=' . urlencode($code)), '/');
+        // TODO sometimes this needs to be complete_signup?
+        $link = rtrim(URL::getSelfURL(), '/') . URL::build('/validate/', 'c=' . urlencode($code));
 
         $this->addPlaceholder('[Link]', $link);
         $this->addPlaceholder('[Message]', new LanguageKey('emails', 'register_message'));

@@ -55,10 +55,9 @@ if (isset($_GET['action'])) {
         if (isset($_GET['do']) && $_GET['do'] == 'send') {
             $errors = [];
 
-            $sent = Email::send(
-                ['email' => $user->data()->email, 'name' => $user->data()->nickname],
-                Output::getClean(SITE_NAME) . ' - Test Email',
-                Output::getClean(SITE_NAME) . ' - Test email successful!',
+            $sent = Email::sendNext(
+                $user,
+                new TestEmailTemplate,
             );
 
             if (isset($sent['error'])) {

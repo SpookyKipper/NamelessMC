@@ -21,6 +21,7 @@ class Email
     public const API_REGISTRATION = 4;
     public const FORUM_TOPIC_REPLY = 5;
     public const MASS_MESSAGE = 6;
+    public const TEST_EMAIL = 7;
 
     public static function sendNext(User $recipient, EmailTemplate $emailTemplate)
     {
