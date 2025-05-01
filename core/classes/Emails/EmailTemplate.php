@@ -3,20 +3,15 @@
 abstract class EmailTemplate
 {
     /**
-     * @var array<string, string> Placeholders for all email templates
-     */
-    private static array $_global_placeholders = [];
-
-    /**
      * @var array<string, string> Placeholders for this email template
      */
     private array $_placeholders = [];
 
     public function __construct()
     {
-        self::addGlobalPlaceholder('[Sitename]', Output::getClean(SITE_NAME));
-        self::addGlobalPlaceholder('[Greeting]', new LanguageKey('emails', 'greeting'));
-        self::addGlobalPlaceholder('[Thanks]', new LanguageKey('emails', 'thanks'));
+        $this->addPlaceholder('[Sitename]', Output::getClean(SITE_NAME));
+        $this->addPlaceholder('[Greeting]', new LanguageKey('emails', 'greeting'));
+        $this->addPlaceholder('[Thanks]', new LanguageKey('emails', 'thanks'));
     }
 
     public abstract function id(): int;
@@ -41,17 +36,6 @@ abstract class EmailTemplate
      * @param string                                   $key   The key to use for the placeholder, should be enclosed in square brackets.
      * @param string|Closure(Language, string): string $value The value to replace the placeholder with.
      */
-    public static function addGlobalPlaceholder(string $key, $value): void
-    {
-        self::$_global_placeholders[$key] = $value;
-    }
-
-    /**
-     * Add a custom placeholder/variable for email messages.
-     *
-     * @param string                                   $key   The key to use for the placeholder, should be enclosed in square brackets.
-     * @param string|Closure(Language, string): string $value The value to replace the placeholder with.
-     */
     final public function addPlaceholder(string $key, $value): void
     {
         $this->_placeholders[$key] = $value;
@@ -59,11 +43,10 @@ abstract class EmailTemplate
 
     final public function renderContent(string $languageCode): string
     {
-        $allPlaceholders = array_merge(self::$_global_placeholders, $this->_placeholders);
-        $placeholderKeys = array_keys($allPlaceholders);
+        $placeholderKeys = array_keys($this->_placeholders);
         $placeholderValues = [];
 
-        foreach ($allPlaceholders as $placeholder) {
+        foreach ($this->_placeholders as $placeholder) {
             if ($placeholder instanceof LanguageKey) {
                 $placeholderValues[] = $placeholder->translate($languageCode);
             } else {
