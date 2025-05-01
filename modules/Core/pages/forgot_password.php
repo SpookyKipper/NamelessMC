@@ -54,7 +54,7 @@ if (empty($_GET['c'])) {
                     $code = SecureRandom::alphanumeric();
 
                     // Send an email
-                    $sent = Email::sendNext(
+                    $sent = Email::send(
                         $target_user,
                         new ForgotPasswordEmailTemplate($code),
                     );

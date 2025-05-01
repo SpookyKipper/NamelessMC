@@ -199,7 +199,7 @@ if (Input::exists()) {
 
                     if (Settings::get('email_verification') === '1') {
                         // Send registration email
-                        Email::sendNext(
+                        Email::send(
                             $user,
                             new RegisterEmailTemplate($code),
                         );

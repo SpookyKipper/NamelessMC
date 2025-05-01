@@ -308,7 +308,7 @@ if (Input::exists()) {
 
                     if (!$auto_verify_oauth_email && Settings::get('email_verification') === '1') {
                         // Send registration email
-                        Email::sendNext(
+                        Email::send(
                             $user,
                             new RegisterEmailTemplate($code),
                         );

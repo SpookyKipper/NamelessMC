@@ -193,7 +193,7 @@ class RegisterEndpoint extends KeyAuthEndpoint {
         $user_id = $this->createUser($api, $username, $email, false, $code);
         $user_id = $user_id['user_id'];
 
-        $email = Email::sendNext(
+        $email = Email::send(
             new User($user_id),
             new RegisterEmailTemplate($code),
         );

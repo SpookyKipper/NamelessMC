@@ -22,45 +22,33 @@ class Email
     public const MASS_MESSAGE = 6;
     public const TEST_EMAIL = 7;
 
-    public static function sendNext(User $recipient, EmailTemplate $emailTemplate)
+    public static function send(User $recipient, EmailTemplate $emailTemplate)
     {
         $languageCode = DB::getInstance()->get('languages', ['id', '=', $recipient->data()->language_id])->first()->short_code;
 
-        $email = [
-            'to' => [
-                'email' => $recipient->data()->email,
-                'name' => $recipient->getDisplayname(),
-            ],
-            'subject' => SITE_NAME . ' - ' . $emailTemplate->subject()->translate($languageCode),
-            'message' => $emailTemplate->renderContent($languageCode),
-            'replyto' => self::getReplyTo(),
-        ];
+        return self::sendInternal(
+            $emailTemplate->id(),
+            $recipient,
+            $emailTemplate->subject()->translate($languageCode),
+            $emailTemplate->renderContent($languageCode)
+        );
+    }
 
-        $result = Settings::get('phpmailer') == '1'
-            ? self::sendMailer($email)
-            : self::sendPHP($email);
-
-        if (isset($result['error'])) {
-            DB::getInstance()->insert('email_errors', [
-                'type' => $emailTemplate->id(),
-                'content' => $result['error'],
-                'at' => date('U'),
-                'user_id' => $recipient->data()->id,
-            ]);
-        }
-
-        return $result;
+    public static function sendRaw(int $type, User $recipient, string $subject, string $content)
+    {
+        return self::sendInternal($type, $recipient, $subject, $content);
     }
 
     /**
-     * Send an email.
+     * Internal helper method to handle common email sending logic
      *
-     * @param  User      $recipient Array containing `'email'` and `'name'` strings for the recipient of the email.
-     * @param  string     $subject   Subject of the email.
-     * @param  string     $message   Message of the email.
-     * @return bool|array Returns true if email sent, otherwise returns an array containing the error.
+     * @param int $type Email type identifier
+     * @param User $recipient Recipient user object
+     * @param string $subject Email subject
+     * @param string $content Email content
+     * @return bool|array Returns true if email sent, otherwise returns an array containing the error
      */
-    public static function sendRaw(int $type, User $recipient, string $subject, string $content)
+    private static function sendInternal(int $type, User $recipient, string $subject, string $content)
     {
         $email = [
             'to' => [
