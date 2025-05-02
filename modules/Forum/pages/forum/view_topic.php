@@ -4,7 +4,7 @@
  *
  * @author Samerton
  * @license MIT
- * @version 2.2.0
+ * @version 2.3.0
  *
  * @var Cache $cache
  * @var FakeSmarty $smarty
@@ -301,25 +301,33 @@ if (Input::exists()) {
 
                 // Get last post ID
                 $last_post_id = DB::getInstance()->lastId();
-                $content = EventHandler::executeEvent('prePostCreate', [
-                    'content' => $content,
-                    'user' => $user,
-                    'mention_notification_type' => 'forum_topic_mention',
-                    'mention_notification_alert_template' => new AlertTemplate(
-                        new LanguageKey('forum', 'new_reply_in_topic', [
-                            'author' => $user->data()->username, 'topic' => $topic->topic_title
-                        ], ROOT_PATH . '/modules/Forum/language'),
-                        null,
-                        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
-                    ),
-                    'mention_notification_email_template' => new ForumTopicReplyEmailTemplate(
-                        $user,
-                        $topic->topic_title,
-                        $content,
-                        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
-                    ),
-                ])['content'];
 
+                //  'mention_notification_type' => 'forum_topic_mention',
+                // 'mention_notification_alert_template' => new AlertTemplate(
+                //        new LanguageKey('forum', 'new_reply_in_topic', [
+                //            'author' => $user->data()->username, 'topic' => $topic->topic_title
+                //        ], ROOT_PATH . '/modules/Forum/language'),
+                //        null,
+                //        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
+                //    ),
+                //    'mention_notification_email_template' => new ForumTopicReplyEmailTemplate(
+                //        $user,
+                //        $topic->topic_title,
+                //        $content,
+                //        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
+                //    ),
+                $post_event = new PrePostCreateEvent(
+                    $content,
+                    $user,
+                    URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id)),
+                    'forum_topic_mention',
+                    new LanguageKey('forum', 'user_tag_info', [
+                        'author' => $user->getDisplayname(),
+                    ], ROOT_PATH . '/modules/Forum/language')
+                );
+                EventHandler::executeEvent($post_event);
+
+                $content = $post_event->content;
                 DB::getInstance()->update('posts', $last_post_id, [
                     'post_content' => $content
                 ]);
@@ -704,7 +712,8 @@ foreach ($results->data as $n => $nValue) {
     }
 
     // Purify post content
-    $content = EventHandler::executeEvent('renderPost', ['content' => $nValue->post_content])['content'];
+    $render_event = new RenderContentEvent($nValue->post_content);
+    EventHandler::executeEvent($render_event);
 
     // Get post date
     if (is_null($nValue->created)) {
@@ -738,7 +747,7 @@ foreach ($results->data as $n => $nValue) {
         'post_date_rough' => $post_date_rough,
         'post_date' => $post_date,
         'buttons' => $buttons,
-        'content' => $content,
+        'content' => $render_event->content,
         'signature' => Output::getPurified(Text::renderEmojis($signature)),
         'fields' => (empty($fields) ? [] : $fields),
         'edited' => is_null($nValue->last_edited)
@@ -804,7 +813,9 @@ if ($user->isLoggedIn() && $can_reply) {
 
         if (isset($_POST['content'])) {
             // Purify post content
-            $content = EventHandler::executeEvent('renderPostEdit', ['content' => $_POST['content']])['content'];
+            $render_event = new RenderContentEditEvent($_POST['content']);
+            EventHandler::executeEvent($render_event);
+            $content = $render_event->content;
         }
 
         $template->getEngine()->addVariable('SUBMIT', $language->get('general', 'submit'));
