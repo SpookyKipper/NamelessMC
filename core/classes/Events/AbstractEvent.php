@@ -5,7 +5,7 @@
  *
  * @package NamelessMC\Events
  * @author Aberdeener
- * @version 2.2.0
+ * @version 2.3.0
  * @license MIT
  */
 abstract class AbstractEvent
@@ -26,16 +26,9 @@ abstract class AbstractEvent
      *
      * @return string The description of the event
      */
-    abstract public static function description(): string;
-
-    /**
-     * Determine whether to return the response after executing the event.
-     *
-     * @return bool Whether to return the response after executing the event
-     */
-    public static function return(): bool
+    public static function description(): string
     {
-        return false;
+        return static::name();
     }
 
     /**
@@ -57,21 +50,6 @@ abstract class AbstractEvent
     final public function params(): array
     {
         return get_object_vars($this);
-    }
-
-    /**
-     * Helper method to dispatch an event, equivalent to
-     * ```php
-     * EventHandler::executeEvent(new EventClass(...));
-     * ```.
-     *
-     * @return array|null The response from the event, or null if the event is not returning a response
-     */
-    final public static function dispatch(): ?array
-    {
-        return EventHandler::executeEvent(
-            self::fromArray(func_get_args())
-        );
     }
 
     /**
