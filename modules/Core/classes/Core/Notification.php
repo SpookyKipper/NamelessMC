@@ -96,11 +96,19 @@ class Notification {
     }
 
     private function sendAlert(int $userId, string $languageCode): void {
+        if ($this->_alertTemplate->link) {
+            $content = null;
+        } else if ($this->_alertTemplate->content instanceof LanguageKey) {
+            $content = $this->_alertTemplate->content->translate($languageCode);
+        } else {
+            $content = $this->_alertTemplate->content;
+        }
+
         Alert::send(
             $userId,
             $this->_alertTemplate->title->translate($languageCode),
             // if the alert has a link set, we don't want to send the content as the alert content
-            $this->_alertTemplate->link ? null : $this->_alertTemplate->content->translate($languageCode),
+            $content,
             $this->_alertTemplate->link,
         );
     }

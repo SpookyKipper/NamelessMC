@@ -302,28 +302,23 @@ if (Input::exists()) {
                 // Get last post ID
                 $last_post_id = DB::getInstance()->lastId();
 
-                //  'mention_notification_type' => 'forum_topic_mention',
-                // 'mention_notification_alert_template' => new AlertTemplate(
-                //        new LanguageKey('forum', 'new_reply_in_topic', [
-                //            'author' => $user->data()->username, 'topic' => $topic->topic_title
-                //        ], ROOT_PATH . '/modules/Forum/language'),
-                //        null,
-                //        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
-                //    ),
-                //    'mention_notification_email_template' => new ForumTopicReplyEmailTemplate(
-                //        $user,
-                //        $topic->topic_title,
-                //        $content,
-                //        URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id))
-                //    ),
+                $post_link = URL::build('/forum/topic/' . urlencode($tid) . '-' . $forum->titleToURL($topic->topic_title), 'pid=' . $last_post_id);
                 $post_event = new PrePostCreateEvent(
                     $content,
                     $user,
-                    URL::build('/forum/topic/' . urlencode($tid), 'pid=' . urlencode($last_post_id)),
                     'forum_topic_mention',
-                    new LanguageKey('forum', 'user_tag_info', [
-                        'author' => $user->getDisplayname(),
-                    ], ROOT_PATH . '/modules/Forum/language')
+                    new AlertTemplate(
+                        new LanguageKey('user', 'user_tag_info', [
+                            'author' => $user->data()->username
+                        ]),
+                        null,
+                        $post_link,
+                    ),
+                    new ForumTopicMentionEmailTemplate(
+                        $user,
+                        $content,
+                        $post_link
+                    ),
                 );
                 EventHandler::executeEvent($post_event);
 
@@ -354,14 +349,12 @@ if (Input::exists()) {
                     $available_hooks,
                 ));
 
-                // Notifications
+                // Notifications - TODO: can this become a listener of TopicReplyCreatedEvent?
                 $users_following = DB::getInstance()->query('SELECT DISTINCT(user_id) FROM nl2_topics_following WHERE topic_id = ? AND user_id != ? AND existing_alerts = 0', [
                     $tid,
                     $user->data()->id
                 ])->results();
                 $users_following = array_map(fn ($row) => $row->user_id, $users_following);
-
-                $replyLink = URL::build('/forum/topic/' . urlencode($tid) . '-' . $forum->titleToURL($topic->topic_title), 'pid=' . $last_post_id);
 
                 $notification = new Notification(
                     'forum_topic_reply',
@@ -370,13 +363,13 @@ if (Input::exists()) {
                             'author' => $user->data()->username, 'topic' => $topic->topic_title
                         ], ROOT_PATH . '/modules/Forum/language'),
                         null,
-                        $replyLink
+                        $post_link,
                     ),
                     new ForumTopicReplyEmailTemplate(
                         $user,
                         $topic->topic_title,
                         $original_content,
-                        $replyLink,
+                        $post_link,
                     ),
                     $users_following,
                     $user->data()->id,

@@ -4,7 +4,7 @@ class AlertTemplate
 {
     public function __construct(
         public LanguageKey $title,
-        public ?LanguageKey $content,
+        public LanguageKey|string|null $content = null,
         public ?string $link = null,
     ) {
         if ($this->link === null && $this->content === null) {

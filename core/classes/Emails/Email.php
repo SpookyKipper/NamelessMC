@@ -21,6 +21,8 @@ class Email
     public const FORUM_TOPIC_REPLY = 5;
     public const MASS_MESSAGE = 6;
     public const TEST_EMAIL = 7;
+    public const REPORT = 8;
+    public const FORUM_TOPIC_MENTION = 9;
 
     public static function send(User $recipient, EmailTemplate $emailTemplate)
     {

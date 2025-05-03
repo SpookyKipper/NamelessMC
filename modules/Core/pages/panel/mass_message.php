@@ -150,10 +150,8 @@ if (Input::exists()) {
                     Module::getIdFromName('Core'),
                     $language->get('admin', 'mass_message'),
                     [
-                        'callback' => 'MassMessage::parseContent',
-                        'content' => Input::get('content'),
                         'title' => Input::get('subject'),
-                        'type' => 'mass_message',
+                        'content' => Input::get('content'),
                         'users' => $users,
                         'skip_purify' => (bool) Input::get('unsafe_html'),
                     ],
