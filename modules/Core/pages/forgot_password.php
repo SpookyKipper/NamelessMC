@@ -61,9 +61,7 @@ if (empty($_GET['c'])) {
 
                     if (isset($sent['error'])) {
                         $error = $language->get('user', 'unable_to_send_forgot_password_email');
-                    }
-
-                    if (!isset($error)) {
+                    } else {
                         $target_user->update([
                             'reset_code' => $code
                         ]);
@@ -114,7 +112,7 @@ if (empty($_GET['c'])) {
     // Check code exists
     $target_user = new User($_GET['c'], 'reset_code');
     if (!$target_user->exists()) {
-        Redirect::to('/forgot_password');
+        Redirect::to(URL::build('/forgot_password'));
     }
 
     if (Input::exists()) {
@@ -142,17 +140,13 @@ if (empty($_GET['c'])) {
             if ($validation->passed()) {
                 if (strcasecmp($target_user->data()->email, $_POST['email']) == 0) {
                     $new_password = password_hash(Input::get('password'), PASSWORD_BCRYPT, ['cost' => 13]);
-                    try {
-                        $target_user->update([
-                            'password' => $new_password,
-                            'reset_code' => null
-                        ]);
+                    $target_user->update([
+                        'password' => $new_password,
+                        'reset_code' => null
+                    ]);
 
-                        Session::flash('login_success', $language->get('user', 'forgot_password_change_successful'));
-                        Redirect::to(URL::build('/login'));
-                    } catch (Exception $e) {
-                        $errors = [$e->getMessage()];
-                    }
+                    Session::flash('login_success', $language->get('user', 'forgot_password_change_successful'));
+                    Redirect::to(URL::build('/login'));
                 } else {
                     $errors = [$language->get('user', 'incorrect_email')];
                 }
