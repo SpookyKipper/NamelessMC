@@ -37,6 +37,9 @@ if (isset($_GET['do'])) {
 
                 DB::getInstance()->delete('email_errors', ['id', '<>', 0]);
 
+                $cache->setCache('notices_cache');
+                $cache->store('email_errors', 0);
+
                 Session::flash('emails_errors_success', $language->get('admin', 'email_errors_purged_successfully'));
                 Redirect::to(URL::build('/panel/core/emails/errors'));
             }
@@ -44,6 +47,9 @@ if (isset($_GET['do'])) {
             if ($_GET['do'] == 'delete' && isset($_GET['id']) && is_numeric($_GET['id'])) {
 
                 DB::getInstance()->delete('email_errors', ['id', $_GET['id']]);
+
+                $cache->setCache('notices_cache');
+                $cache->erase('email_errors');
 
                 Session::flash('emails_errors_success', $language->get('admin', 'error_deleted_successfully'));
                 Redirect::to(URL::build('/panel/core/emails/errors'));

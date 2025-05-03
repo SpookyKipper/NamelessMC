@@ -304,7 +304,7 @@ class Core_Module extends Module {
 
         // -- Events
         EventHandler::registerEvent(AnnouncementCreatedEvent::class);
-        EventHandler::registerEvent(GenerateNotificationContentEvent::class);
+        EventHandler::registerEvent(GenerateMassMessageContentEvent::class);
         EventHandler::registerEvent(GroupClonedEvent::class);
         EventHandler::registerEvent(ReportCreatedEvent::class);
         EventHandler::registerEvent(UserBannedEvent::class);
@@ -453,9 +453,9 @@ class Core_Module extends Module {
 
         EventHandler::registerListener(GroupClonedEvent::class, CloneGroupHook::class);
 
-        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'ContentHook::purify');
-        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'ContentHook::renderEmojis', 10);
-        EventHandler::registerListener(GenerateNotificationContentEvent::class, 'MentionsHook::parsePost', 5);
+        EventHandler::registerListener(GenerateMassMessageContentEvent::class, 'ContentHook::purify');
+        EventHandler::registerListener(GenerateMassMessageContentEvent::class, 'ContentHook::renderEmojis', 10);
+        EventHandler::registerListener(GenerateMassMessageContentEvent::class, 'MentionsHook::parsePost', 5);
 
         EventHandler::registerListener(RenderContentEvent::class, [ContentHook::class, 'purify']);
         EventHandler::registerListener(RenderContentEvent::class, [ContentHook::class, 'renderEmojis'], 10);

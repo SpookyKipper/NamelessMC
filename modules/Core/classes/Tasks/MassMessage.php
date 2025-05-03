@@ -36,7 +36,7 @@ class MassMessage extends Task {
         $title = $this->getData()['title'];
         $skipPurify = $this->getData()['skip_purify'];
 
-        $event = new GenerateNotificationContentEvent($content, $title, $skipPurify);
+        $event = new GenerateMassMessageContentEvent($content, $title, $skipPurify);
         EventHandler::executeEvent($event);
         $content = $event->content;
 

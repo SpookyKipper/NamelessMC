@@ -1,6 +1,6 @@
 <?php
 
-class GenerateNotificationContentEvent extends AbstractEvent {
+class GenerateMassMessageContentEvent extends AbstractEvent {
 
     public string $content;
     public bool $skip_purify;
@@ -10,14 +10,6 @@ class GenerateNotificationContentEvent extends AbstractEvent {
         $this->content = $content;
         $this->skip_purify = $skip_purify;
         $this->title = $title;
-    }
-
-    public static function name(): string {
-        return 'generateNotificationContent';
-    }
-
-    public static function description(): string {
-        return (new Language())->get('admin', 'generate_notification_content_hook_info');
     }
 
     public static function internal(): bool {
