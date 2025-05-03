@@ -23,13 +23,10 @@ class Notification {
      * Instantiate a new notification
      *
      * @param string $type Type of notification
-     * @param string|LanguageKey $title Title of notification
-     * @param string|LanguageKey $content Notification content. For alerts, if $alertUrl is set, this will ignored. If $alertUrl is not set, this will be the content of the alert. This will always be the content of the email.
+     * @param AlertTemplate $alertTemplate Alert template
+     * @param EmailTemplate $emailTemplate Email template
      * @param int|int[] $recipients Notification recipient or recipients - array of user IDs
      * @param int       $authorId        User ID that sent the notification
-     * @param ?callable $contentCallback Optional callback to perform for each recipient's content
-     * @param bool      $skipPurify      Whether to skip content purifying, default false
-     * @param ?string $alertUrl        Optional URL to link to when clicking the alert
      *
      * @throws NotificationTypeNotFoundException
      */

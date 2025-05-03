@@ -21,7 +21,7 @@ class MentionsHook extends HookBase {
     public static function preCreate(AbstractEvent $event): void {
         if (!empty($event->content) && isset($event->user)) {
             // TODO: better subclassing? ie: $event instanceof MentionableEvent?
-            if (isset($event->mention_notification_type)) {
+            if (isset($event->mention_notification_type, $event->mention_notification_alert_template, $event->mention_notification_email_template)) {
                 $event->content = MentionsParser::parseAndNotify(
                     $event->user->data()->id,
                     $event->content,

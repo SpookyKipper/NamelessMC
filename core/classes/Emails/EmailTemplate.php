@@ -3,7 +3,7 @@
 abstract class EmailTemplate
 {
     /**
-     * @var array<string, string> Placeholders for this email template
+     * @var array<string, LanguageKey|string> Placeholders for this email template
      */
     private array $_placeholders = [];
 
