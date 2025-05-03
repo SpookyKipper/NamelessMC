@@ -245,7 +245,6 @@
     "admin/force_www": "Force www?",
     "admin/forum_posts": "Display on Forum",
     "admin/general_settings": "General Settings",
-    "admin/generate_notification_content_hook_info": "Generates notification content before sending",
     "admin/generate_sitemap": "Generate Sitemap",
     "admin/google_analytics": "Google Analytics",
     "admin/google_analytics_help": "Add Google Analytics to your website to track visitors and statistics. You will need to create a Google Analytics account to use this functionality. Enter your Google Analytics Web Property ID. The ID looks like UA-XXXXA-X and you can find it in your account information or in the tracking code provided by Google.",
