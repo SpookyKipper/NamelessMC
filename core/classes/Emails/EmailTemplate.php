@@ -14,8 +14,6 @@ abstract class EmailTemplate
         $this->addPlaceholder('[Thanks]', new LanguageKey('emails', 'thanks'));
     }
 
-    public abstract function id(): int;
-
     /**
      * Returns the snake_case representation of the email template name,
      * derived from the class name with "EmailTemplate" removed.

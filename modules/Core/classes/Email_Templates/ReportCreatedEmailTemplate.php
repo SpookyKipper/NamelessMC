@@ -2,8 +2,6 @@
 
 class ReportCreatedEmailTemplate extends EmailTemplate
 {
-    public const ID = 8;
-
     public function __construct(string $link, User $reported, User $author)
     {
         $this->addPlaceholder('[Link]', $link);
@@ -13,11 +11,6 @@ class ReportCreatedEmailTemplate extends EmailTemplate
         ]));
 
         parent::__construct();
-    }
-
-    public function id(): int
-    {
-        return self::ID;
     }
 
     public function subject(): LanguageKey

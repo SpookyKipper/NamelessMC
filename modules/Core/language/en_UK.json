@@ -771,6 +771,7 @@
     "admin/integration_settings_does_not_exist": "Integration settings file for integration {{integration}} does not exist",
     "admin/top": "Top",
     "admin/footer": "Footer",
+    "admin/mailer": "Mailer",
     "api/account_validated": "Account validated successfully",
     "api/finish_registration_email": "Please check your emails to complete registration.",
     "api/finish_registration_link": "Please click on the following link to complete registration:",

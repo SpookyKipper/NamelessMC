@@ -16,41 +16,36 @@ class Email
 {
     public const EMAIL_MAX_LENGTH = 75000;
 
-    public const REGISTRATION = 1;
-    public const FORGOT_PASSWORD = 3;
-    public const FORUM_TOPIC_REPLY = 5;
-    public const MASS_MESSAGE = 6;
-    public const TEST_EMAIL = 7;
-    public const REPORT = 8;
-    public const FORUM_TOPIC_MENTION = 9;
+    public const TEST_EMAIL = 'TestEmail';
+    public const MASS_MESSAGE = 'MassMessage';
 
     public static function send(User $recipient, EmailTemplate $emailTemplate)
     {
         $languageCode = DB::getInstance()->get('languages', ['id', '=', $recipient->data()->language_id])->first()->short_code;
 
         return self::sendInternal(
-            $emailTemplate->id(),
+            str_replace('EmailTemplate', '', $emailTemplate::class),
             $recipient,
             $emailTemplate->subject()->translate($languageCode),
             $emailTemplate->renderContent($languageCode)
         );
     }
 
-    public static function sendRaw(int $type, User $recipient, string $subject, string $content)
+    public static function sendRaw(string $mailer, User $recipient, string $subject, string $content)
     {
-        return self::sendInternal($type, $recipient, $subject, $content);
+        return self::sendInternal($mailer, $recipient, $subject, $content);
     }
 
     /**
      * Internal helper method to handle common email sending logic
      *
-     * @param int $type Email type identifier
+     * @param string $mailer Email mailer identifier
      * @param User $recipient Recipient user object
      * @param string $subject Email subject
      * @param string $content Email content
      * @return bool|array Returns true if email sent, otherwise returns an array containing the error
      */
-    private static function sendInternal(int $type, User $recipient, string $subject, string $content)
+    private static function sendInternal(string $mailer, User $recipient, string $subject, string $content)
     {
         $email = [
             'to' => [
@@ -68,7 +63,7 @@ class Email
 
         if (isset($result['error'])) {
             DB::getInstance()->insert('email_errors', [
-                'type' => $type,
+                'mailer' => $mailer,
                 'content' => $result['error'],
                 'at' => date('U'),
                 'user_id' => $recipient->data()->id,

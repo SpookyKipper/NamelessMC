@@ -2,8 +2,6 @@
 
 class RegisterEmailTemplate extends EmailTemplate
 {
-    public const ID = 1;
-
     public function __construct(string $code)
     {
         // TODO sometimes this needs to be complete_signup?
@@ -13,11 +11,6 @@ class RegisterEmailTemplate extends EmailTemplate
         $this->addPlaceholder('[Message]', new LanguageKey('emails', 'register_message'));
 
         parent::__construct();
-    }
-
-    public function id(): int
-    {
-        return self::ID;
     }
 
     public function subject(): LanguageKey

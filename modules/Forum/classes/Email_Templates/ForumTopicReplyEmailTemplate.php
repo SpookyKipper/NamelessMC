@@ -2,8 +2,6 @@
 
 class ForumTopicReplyEmailTemplate extends EmailTemplate
 {
-    public const ID = 5;
-
     private User $author;
     private string $topicTitle;
 
@@ -21,11 +19,6 @@ class ForumTopicReplyEmailTemplate extends EmailTemplate
         $this->topicTitle = $topicTitle;
 
         parent::__construct();
-    }
-
-    public function id(): int
-    {
-        return self::ID;
     }
 
     public function subject(): LanguageKey

@@ -2,8 +2,6 @@
 
 class ForumTopicMentionEmailTemplate extends EmailTemplate
 {
-    public const ID = 9;
-
     private User $author;
 
     public function __construct(User $author, string $content, string $link)
@@ -19,11 +17,6 @@ class ForumTopicMentionEmailTemplate extends EmailTemplate
         $this->author = $author;
 
         parent::__construct();
-    }
-
-    public function id(): int
-    {
-        return self::ID;
     }
 
     public function subject(): LanguageKey
