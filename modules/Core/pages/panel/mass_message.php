@@ -154,6 +154,7 @@ if (Input::exists()) {
                         'content' => Input::get('content'),
                         'users' => $users,
                         'skip_purify' => (bool) Input::get('unsafe_html'),
+                        'bypass_notification_settings' => (bool) Input::get('ignore_opt_in'),
                     ],
                     date('U'),
                     null,

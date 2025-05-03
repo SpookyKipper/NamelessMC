@@ -178,6 +178,7 @@
     "admin/email_errors_logged": "Email errors have been logged",
     "admin/email_errors_purged_successfully": "Email errors have been purged successfully.",
     "admin/email_logs": "Mass Emails",
+    "admin/email_message_subject": "Subject",
     "admin/email_password_hidden": "The password is not shown for security reasons.",
     "admin/email_port": "Port",
     "admin/email_port_invalid": "Please insert a valid email port.",

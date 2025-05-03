@@ -3,7 +3,7 @@
 class AlertTemplate
 {
     public function __construct(
-        public LanguageKey $title,
+        public LanguageKey|string $title,
         public LanguageKey|string|null $content = null,
         public ?string $link = null,
     ) {

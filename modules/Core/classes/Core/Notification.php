@@ -16,6 +16,7 @@ class Notification {
     private int $_authorId;
     private array $_recipients = [];
     private string $_type;
+    private bool $_bypassNotificationSettings;
 
     private static array $_types = [];
 
@@ -27,6 +28,7 @@ class Notification {
      * @param EmailTemplate $emailTemplate Email template
      * @param int|int[] $recipients Notification recipient or recipients - array of user IDs
      * @param int       $authorId        User ID that sent the notification
+     * @param bool $bypassNotificationSettings Whether to bypass the user's notification settings
      *
      * @throws NotificationTypeNotFoundException
      */
@@ -36,6 +38,7 @@ class Notification {
         EmailTemplate $emailTemplate,
         int|array $recipients,
         int $authorId,
+        bool $bypassNotificationSettings = false,
     ) {
         if (!in_array($type, array_column(self::getTypes(), 'key'))) {
             throw new NotificationTypeNotFoundException("Type $type not registered");
@@ -45,6 +48,7 @@ class Notification {
         $this->_alertTemplate = $alertTemplate;
         $this->_emailTemplate = $emailTemplate;
         $this->_authorId = $authorId;
+        $this->_bypassNotificationSettings = $bypassNotificationSettings;
 
         if (!is_array($recipients)) {
             $recipients = [$recipients];
@@ -74,6 +78,12 @@ class Notification {
             $userId = $recipient['id'];
             $languageCode = $recipient['language_code'];
 
+            if ($this->_bypassNotificationSettings) {
+                $this->sendAlert($userId, $languageCode);
+                $this->sendEmail($userId, $languageCode);
+                continue;
+            }
+
             $preferences = DB::getInstance()->query(
                 <<<SQL
                     SELECT `alert`, `email`
@@ -93,6 +103,12 @@ class Notification {
     }
 
     private function sendAlert(int $userId, string $languageCode): void {
+        if ($this->_alertTemplate->title instanceof LanguageKey) {
+            $title = $this->_alertTemplate->title->translate($languageCode);
+        } else {
+            $title = $this->_alertTemplate->title;
+        }
+
         if ($this->_alertTemplate->link) {
             $content = null;
         } else if ($this->_alertTemplate->content instanceof LanguageKey) {
@@ -103,7 +119,7 @@ class Notification {
 
         Alert::send(
             $userId,
-            $this->_alertTemplate->title->translate($languageCode),
+            $title,
             // if the alert has a link set, we don't want to send the content as the alert content
             $content,
             $this->_alertTemplate->link,
@@ -111,12 +127,19 @@ class Notification {
     }
 
     private function sendEmail(int $userId, string $languageCode): void {
+        if ($this->_emailTemplate->subject() instanceof LanguageKey) {
+            $content = $this->_emailTemplate->subject()->translate($languageCode);
+        } else {
+            $content = $this->_emailTemplate->subject();
+        }
+
         $task = (new SendEmail())->fromNew(
             Module::getIdFromName('Core'),
             'Send Email Notification',
             [
-                'subject' => $this->_emailTemplate->subject()->translate($languageCode),
+                'subject' => $content,
                 'content' => $this->_emailTemplate->renderContent($languageCode),
+                'mailer' => str_replace('EmailTemplate', '', $this->_emailTemplate::class),
             ],
             date('U'), // TODO: schedule a date/time?
             'User',

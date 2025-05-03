@@ -47,7 +47,7 @@ class SendEmail extends Task {
         }
 
         $sent = Email::sendRaw(
-            Email::MASS_MESSAGE,
+            $this->getData()['mailer'],
             $user,
             $this->getData()['subject'],
             $this->getData()['content'],

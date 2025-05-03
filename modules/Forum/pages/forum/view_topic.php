@@ -302,7 +302,7 @@ if (Input::exists()) {
                 // Get last post ID
                 $last_post_id = DB::getInstance()->lastId();
 
-                $post_link = URL::build('/forum/topic/' . urlencode($tid) . '-' . $forum->titleToURL($topic->topic_title), 'pid=' . $last_post_id);
+                $post_link = rtrim(URL::getSelfURL(), '/') . URL::build('/forum/topic/' . urlencode($tid) . '-' . $forum->titleToURL($topic->topic_title), 'pid=' . $last_post_id);
                 $post_event = new PrePostCreateEvent(
                     $content,
                     $user,

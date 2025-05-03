@@ -2,15 +2,19 @@
 
 class MassMessageEmailTemplate extends EmailTemplate
 {
-    public function __construct(string $content)
+    private string $subject;
+
+    public function __construct(string $subject, string $content)
     {
+        $this->subject = $subject;
+
         $this->addPlaceholder('[Message]', $content);
 
         parent::__construct();
     }
 
-    public function subject(): LanguageKey
+    public function subject(): string
     {
-        return new LanguageKey('admin', 'mass_message');
+        return $this->subject;
     }
 }

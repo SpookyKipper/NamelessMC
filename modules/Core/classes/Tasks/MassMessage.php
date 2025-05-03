@@ -34,7 +34,7 @@ class MassMessage extends Task {
 
         $content = $this->getData()['content'];
         $title = $this->getData()['title'];
-        $skipPurify = $this->getData()['skip_purify'] ?? false;
+        $skipPurify = $this->getData()['skip_purify'];
 
         $event = new GenerateNotificationContentEvent($content, $title, $skipPurify);
         EventHandler::executeEvent($event);
@@ -43,14 +43,16 @@ class MassMessage extends Task {
         $notification = new Notification(
             'mass_message',
             new AlertTemplate(
-                new LanguageKey('admin', 'mass_message'),
+                $title,
                 $content,
             ),
             new MassMessageEmailTemplate(
+                $title,
                 $content,
             ),
             array_map(static fn ($r) => $r->id, $recipients->results()),
             $this->getUserId(),
+            (bool) $this->getData()['bypass_notification_settings'],
         );
         $notification->send();
 
