@@ -10,7 +10,9 @@ class NotificationEmailTemplate extends EmailTemplate
 
         $this->addPlaceholder('[Title]', $subject);
         $this->addPlaceholder('[Content]', $content);
-        $this->addPlaceholder('[Link]', $link);
+
+        // Register all notifications to nl2_alerts even if alert preference is off? Then all links can be sent to /user/alerts/?id={ID} then it will direct user + mark as read
+        $this->addPlaceholder('[Link]', $link ?? URL::getSelfURL());
 
         parent::__construct();
     }

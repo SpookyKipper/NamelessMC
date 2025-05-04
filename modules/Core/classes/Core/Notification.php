@@ -23,12 +23,13 @@ class Notification {
     /**
      * Instantiate a new notification
      *
-     * @param string $type Type of notification
-     * @param AlertTemplate $alertTemplate Alert template
-     * @param EmailTemplate $emailTemplate Email template
-     * @param int|int[] $recipients Notification recipient or recipients - array of user IDs
-     * @param int       $authorId        User ID that sent the notification
-     * @param bool $bypassNotificationSettings Whether to bypass the user's notification settings
+     * @param string             $type                       Type of notification
+     * @param string|LanguageKey $title                      Title of notification
+     * @param string|LanguageKey $content                    Notification content. For alerts, if $alertUrl is set, this will ignored. If $alertUrl is not set, this will be the content of the alert. This will always be the content of the email.
+     * @param int|int[]          $recipients                 Notification recipient or recipients - array of user IDs
+     * @param int                $authorId                   User ID that sent the notification
+     * @param bool               $bypassNotificationSettings Whether to bypass the user's notification settings
+     * @param ?string            $link                       Optional URL to link to when clicking the alert
      *
      * @throws NotificationTypeNotFoundException
      */
@@ -46,7 +47,7 @@ class Notification {
         }
 
         $this->_type = $type;
-        $this->_alertTemplate = new AlertTemplate($title, $content, $link);
+        $this->_alertTemplate = new AlertTemplate($title, $link ? null : $content, $link);
         $this->_emailTemplate = new NotificationEmailTemplate($title, $content, $link);
         $this->_authorId = $authorId;
         $this->_bypassNotificationSettings = $bypassNotificationSettings;
