@@ -358,25 +358,23 @@ if (Input::exists()) {
 
                 $notification = new Notification(
                     'forum_topic_reply',
-                    $topic->topic_title,
-                    $original_content,
+                    new AlertTemplate(
+                        new LanguageKey('forum', 'new_reply_in_topic', [
+                            'author' => $user->data()->username, 'topic' => $topic->topic_title
+                        ], ROOT_PATH . '/modules/Forum/language'),
+                        null,
+                        $post_link,
+                    ),
+                    new ForumTopicReplyEmailTemplate(
+                        $user,
+                        $topic->topic_title,
+                        $original_content,
+                        $post_link,
+                    ),
                     $users_following,
                     $user->data()->id,
 
                 );
-                $notification->setAlertTemplate(new AlertTemplate(
-                    new LanguageKey('forum', 'new_reply_in_topic', [
-                        'author' => $user->data()->username, 'topic' => $topic->topic_title
-                    ], ROOT_PATH . '/modules/Forum/language'),
-                    null,
-                    $post_link,
-                ));
-                $notification->setEmailTemplate(new ForumTopicReplyEmailTemplate(
-                    $user,
-                    $topic->topic_title,
-                    $original_content,
-                    $post_link,
-                ));
                 $notification->send();
 
                 if (count($users_following)) {
