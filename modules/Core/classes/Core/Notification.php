@@ -34,19 +34,20 @@ class Notification {
      */
     public function __construct(
         string $type,
-        AlertTemplate $alertTemplate,
-        EmailTemplate $emailTemplate,
+        string|LanguageKey $title,
+        string|LanguageKey $content,
         int|array $recipients,
         int $authorId,
         bool $bypassNotificationSettings = false,
+        ?string $link = null,
     ) {
         if (!in_array($type, array_column(self::getTypes(), 'key'))) {
             throw new NotificationTypeNotFoundException("Type $type not registered");
         }
 
         $this->_type = $type;
-        $this->_alertTemplate = $alertTemplate;
-        $this->_emailTemplate = $emailTemplate;
+        $this->_alertTemplate = new AlertTemplate($title, $content, $link);
+        $this->_emailTemplate = new NotificationEmailTemplate($title, $content, $link);
         $this->_authorId = $authorId;
         $this->_bypassNotificationSettings = $bypassNotificationSettings;
 
@@ -70,6 +71,14 @@ class Notification {
                 'language_code' => $languageCodes[$recipientId] ?? DEFAULT_LANGUAGE,
             ];
         }, $recipients);
+    }
+
+    public function setAlertTemplate(AlertTemplate $template): void {
+        $this->_alertTemplate = $template;
+    }
+
+    public function setEmailTemplate(EmailTemplate $template): void {
+        $this->_emailTemplate = $template;
     }
 
     public function send(): void {
