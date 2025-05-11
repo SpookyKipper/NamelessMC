@@ -1,12 +1,21 @@
 <?php
-/*
- *	Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr8
+/**
+ * User messaging page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.3.0
  *
- *  UserCP messaging page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 // Must be logged in
@@ -17,15 +26,11 @@ if (!$user->isLoggedIn()) {
 // Always define page name for navbar
 const PAGE = 'cc_messaging';
 $page_title = $language->get('user', 'user_cp');
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
 
 $timeago = new TimeAgo(TIMEZONE);
 
-$smarty->assign(
-    [
-        'ERROR_TITLE' => $language->get('general', 'error')
-    ]
-);
+$template->getEngine()->addVariable('ERROR_TITLE', $language->get('general', 'error'));
 
 // Get page
 if (isset($_GET['p'])) {
@@ -59,7 +64,7 @@ if (!isset($_GET['action'])) {
     $results = $paginator->getLimited($messages, 10, $p, count($messages));
     $pagination = $paginator->generate(7, URL::build('/user/messaging/'));
 
-    $smarty->assign('PAGINATION', $pagination);
+    $template->getEngine()->addVariable('PAGINATION', $pagination);
 
     // Array to pass to template
     $template_array = [];
@@ -90,41 +95,37 @@ if (!isset($_GET['action'])) {
         ];
     }
 
-    // Assign Smarty variables
-    $smarty->assign(
-        [
-            'USER_CP' => $language->get('user', 'user_cp'),
-            'MESSAGING' => $language->get('user', 'messaging'),
-            'MESSAGES' => $template_array,
-            'NO_MESSAGES' => $language->get('user', 'no_messages_full'),
-            'MESSAGE_TITLE' => $language->get('user', 'message_title'),
-            'PARTICIPANTS' => $language->get('user', 'participants'),
-            'LAST_MESSAGE' => $language->get('user', 'last_message'),
-        ]
-    );
+    // Assign template variables
+    $template->getEngine()->addVariables([
+        'USER_CP' => $language->get('user', 'user_cp'),
+        'MESSAGING' => $language->get('user', 'messaging'),
+        'MESSAGES' => $template_array,
+        'NO_MESSAGES' => $language->get('user', 'no_messages_full'),
+        'MESSAGE_TITLE' => $language->get('user', 'message_title'),
+        'PARTICIPANTS' => $language->get('user', 'participants'),
+        'LAST_MESSAGE' => $language->get('user', 'last_message'),
+    ]);
 
     if ($user->hasPermission('usercp.messaging')) {
         // Can send messages
-        $smarty->assign(
-            [
-                'NEW_MESSAGE' => $language->get('user', 'new_message'),
-                'NEW_MESSAGE_LINK' => URL::build('/user/messaging/', 'action=new')
-            ]
-        );
+        $template->getEngine()->addVariables([
+            'NEW_MESSAGE' => $language->get('user', 'new_message'),
+            'NEW_MESSAGE_LINK' => URL::build('/user/messaging/', 'action=new')
+        ]);
     }
 
     // Load modules + template
     Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
-    require(ROOT_PATH . '/core/templates/cc_navbar.php');
+    require ROOT_PATH . '/core/templates/cc_navbar.php';
 
     $template->onPageLoad();
 
-    require(ROOT_PATH . '/core/templates/navbar.php');
-    require(ROOT_PATH . '/core/templates/footer.php');
+    require ROOT_PATH . '/core/templates/navbar.php';
+    require ROOT_PATH . '/core/templates/footer.php';
 
     // Display template
-    $template->displayTemplate('user/messaging.tpl', $smarty);
+    $template->displayTemplate('user/messaging');
 
 } else {
     if ($_GET['action'] == 'new') {
@@ -227,6 +228,9 @@ if (!isset($_GET['action'])) {
                                 // Get the PM ID
                                 $last_id = DB::getInstance()->lastId();
 
+                                $event = new ContentCreateEvent(Input::get('content'), $user);
+                                EventHandler::executeEvent($event);
+
                                 // Insert post content into database
                                 DB::getInstance()->insert(
                                     'private_messages_replies',
@@ -234,7 +238,7 @@ if (!isset($_GET['action'])) {
                                         'pm_id' => $last_id,
                                         'author_id' => $user->data()->id,
                                         'created' => date('U'),
-                                        'content' => Input::get('content')
+                                        'content' => $event->content
                                     ]
                                 );
 
@@ -285,36 +289,39 @@ if (!isset($_GET['action'])) {
         }
 
         if (isset($error)) {
-            $smarty->assign('ERROR', $error);
+            $template->getEngine()->addVariable('ERROR', $error);
         }
 
         if (isset($_GET['uid'])) {
             // Messaging a specific user
-            $user_messaging = DB::getInstance()->get('users', ['id', $_GET['uid']])->results();
+            $user_messaging = DB::getInstance()->get('users', ['id', $_GET['uid']]);
 
-            if (count($user_messaging)) {
-                $smarty->assign('TO_USER', Output::getClean($user_messaging[0]->username));
+            if ($user_messaging->count()) {
+                $template->getEngine()->addVariable('TO_USER', Output::getClean($user_messaging->first()->username));
             }
         }
 
-        $content = (isset($_POST['content'])) ? EventHandler::executeEvent('renderPrivateMessageEdit', ['content' => $_POST['content']])['content'] : null;
+        $content = null;
+        if (isset($_POST['content'])) {
+            $render_event = new RenderContentEditEvent($_POST['content']);
+            EventHandler::executeEvent($render_event);
+            $content = $render_event->content;
+        }
 
-        // Assign Smarty variables
-        $smarty->assign(
-            [
-                'NEW_MESSAGE' => $language->get('user', 'new_message'),
-                'CANCEL' => $language->get('general', 'cancel'),
-                'CONFIRM_CANCEL' => $language->get('general', 'confirm_cancel'),
-                'CANCEL_LINK' => URL::build('/user/messaging'),
-                'SUBMIT' => $language->get('general', 'submit'),
-                'TOKEN' => Token::get(),
-                'MESSAGE_TITLE' => $language->get('user', 'message_title'),
-                'MESSAGE_TITLE_VALUE' => (isset($_POST['title']) ? Output::getPurified($_POST['title']) : ''),
-                'TO' => $language->get('user', 'to'),
-                'SEPARATE_USERS_WITH_COMMAS' => $language->get('user', 'separate_users_with_commas'),
-                'ALL_USERS' => $user->listAllOtherUsers()
-            ]
-        );
+        // Assign template variables
+        $template->getEngine()->addVariables([
+            'NEW_MESSAGE' => $language->get('user', 'new_message'),
+            'CANCEL' => $language->get('general', 'cancel'),
+            'CONFIRM_CANCEL' => $language->get('general', 'confirm_cancel'),
+            'CANCEL_LINK' => URL::build('/user/messaging'),
+            'SUBMIT' => $language->get('general', 'submit'),
+            'TOKEN' => Token::get(),
+            'MESSAGE_TITLE' => $language->get('user', 'message_title'),
+            'MESSAGE_TITLE_VALUE' => (isset($_POST['title']) ? Output::getPurified($_POST['title']) : ''),
+            'TO' => $language->get('user', 'to'),
+            'SEPARATE_USERS_WITH_COMMAS' => $language->get('user', 'separate_users_with_commas'),
+            'ALL_USERS' => $user->listAllOtherUsers()
+        ]);
 
         $template->assets()->include([
             AssetTree::TINYMCE,
@@ -325,15 +332,15 @@ if (!isset($_GET['action'])) {
         // Load modules + template
         Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
-        require(ROOT_PATH . '/core/templates/cc_navbar.php');
+        require ROOT_PATH . '/core/templates/cc_navbar.php';
 
         $template->onPageLoad();
 
-        require(ROOT_PATH . '/core/templates/navbar.php');
-        require(ROOT_PATH . '/core/templates/footer.php');
+        require ROOT_PATH . '/core/templates/navbar.php';
+        require ROOT_PATH . '/core/templates/footer.php';
 
         // Display template
-        $template->displayTemplate('user/new_message.tpl', $smarty);
+        $template->displayTemplate('user/new_message');
 
     } else if ($_GET['action'] == 'view') {
         // Ensure message is specified
@@ -369,7 +376,8 @@ if (!isset($_GET['action'])) {
                 ]);
 
                 if ($validation->passed()) {
-                    $content = Input::get('content');
+                    $event = new ContentCreateEvent(Input::get('content'), $user);
+                    EventHandler::executeEvent($event);
 
                     // Insert post content into database
                     DB::getInstance()->insert(
@@ -378,7 +386,7 @@ if (!isset($_GET['action'])) {
                             'pm_id' => $pm[0]->id,
                             'author_id' => $user->data()->id,
                             'created' => date('U'),
-                            'content' => $content
+                            'content' => $event->content
                         ]
                     );
 
@@ -404,7 +412,7 @@ if (!isset($_GET['action'])) {
                     }
 
                     // Display success message
-                    $smarty->assign('MESSAGE_SENT', $language->get('user', 'message_sent_successfully'));
+                    $template->getEngine()->addVariable('MESSAGE_SENT', $language->get('user', 'message_sent_successfully'));
                     unset($_POST['content']);
 
                 } else {
@@ -420,7 +428,7 @@ if (!isset($_GET['action'])) {
         }
 
         if (isset($error)) {
-            $smarty->assign('ERROR', $error);
+            $template->getEngine()->addVariable('ERROR', $error);
         }
 
         // Get all PM replies
@@ -435,7 +443,7 @@ if (!isset($_GET['action'])) {
         $results = $paginator->getLimited($pm_replies, 10, $p, count($pm_replies));
         $pagination = $paginator->generate(7, URL::build('/user/messaging/', 'action=view&amp;message=' . urlencode($pm[0]->id) . '&amp;'));
 
-        $smarty->assign('PAGINATION', $pagination);
+        $template->getEngine()->addVariable('PAGINATION', $pagination);
 
         // Array to pass to template
         $template_array = [];
@@ -443,6 +451,9 @@ if (!isset($_GET['action'])) {
         // Display the correct number of messages
         foreach ($results->data as $nValue) {
             $target_user = new User($nValue->author_id);
+
+            $render_event = new RenderContentEvent($nValue->content);
+            EventHandler::executeEvent($render_event);
 
             $template_array[] = [
                 'id' => $nValue->id,
@@ -454,7 +465,7 @@ if (!isset($_GET['action'])) {
                 'author_groups' => $target_user->getAllGroupHtml(),
                 'message_date' => $timeago->inWords($nValue->created, $language),
                 'message_date_full' => date(DATE_FORMAT, $nValue->created),
-                'content' => EventHandler::executeEvent('renderPrivateMessage', ['content' => $nValue->content])['content'],
+                'content' => $render_event->content,
             ];
         }
 
@@ -466,8 +477,8 @@ if (!isset($_GET['action'])) {
         }
         $participants = rtrim($participants, ', ');
 
-        // Smarty variables
-        $smarty->assign([
+        // Template variables
+        $template->getEngine()->addVariables([
             'MESSAGE_TITLE' => Output::getClean($pm[0]->title),
             'BACK' => $language->get('general', 'back'),
             'BACK_LINK' => URL::build('/user/messaging'),
@@ -486,7 +497,12 @@ if (!isset($_GET['action'])) {
             'NO' => $language->get('general', 'no'),
         ]);
 
-        $content = (isset($_POST['content'])) ? EventHandler::executeEvent('renderPrivateMessageEdit', ['content' => $_POST['content']])['content'] : null;
+        $content = null;
+        if (isset($_POST['content'])) {
+            $render_event = new RenderContentEditEvent($_POST['content']);
+            EventHandler::executeEvent($render_event);
+            $content = $render_event->content;
+        }
 
         $template->assets()->include([
             AssetTree::TINYMCE,
@@ -496,15 +512,15 @@ if (!isset($_GET['action'])) {
 
         Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
-        require(ROOT_PATH . '/core/templates/cc_navbar.php');
+        require ROOT_PATH . '/core/templates/cc_navbar.php';
 
         $template->onPageLoad();
 
-        require(ROOT_PATH . '/core/templates/navbar.php');
-        require(ROOT_PATH . '/core/templates/footer.php');
+        require ROOT_PATH . '/core/templates/navbar.php';
+        require ROOT_PATH . '/core/templates/footer.php';
 
         // Display template
-        $template->displayTemplate('user/view_message.tpl', $smarty);
+        $template->displayTemplate('user/view_message');
 
     } else if ($_GET['action'] == 'leave') {
         // Try to remove the user from the conversation

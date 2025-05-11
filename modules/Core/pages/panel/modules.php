@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr13
+/**
+ * Staff panel modules page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel modules page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.modules')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,7 +27,7 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'modules';
 const PANEL_PAGE = 'modules';
 $page_title = $language->get('admin', 'modules');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 // Load modules + template
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
@@ -47,18 +56,19 @@ if (!isset($_GET['action'])) {
             }
 
             try {
+                /** @var Module $module */
                 require_once ROOT_PATH . '/modules/' . $item->name . '/init.php';
             } catch (Exception $e) {
-                $term = 'unable_to_load_module';
-
-                if ($e->getMessage() === 'Translation file not found') {
-                    $term = 'unable_to_load_outdated_module';
-                }
-
-                $errors[] = $language->get('admin', $term, [
+                $variables = [
                     'message' => $e->getMessage(),
                     'module' => Output::getClean($item->name),
-                ]);
+                ];
+
+                if ($e->getMessage() === 'Translation file not found') {
+                    $errors[] = $language->get('admin', 'unable_to_load_outdated_module', $variables);
+                } else {
+                    $errors[] = $language->get('admin', 'unable_to_load_module', $variables);
+                }
                 continue;
             }
         }
@@ -74,6 +84,8 @@ if (!isset($_GET['action'])) {
                 'actualVersion' => Text::bold(NAMELESS_VERSION)
             ]) : false,
             'disable_link' => (($module->getName() != 'Core' && $item->enabled) ? URL::build('/panel/core/modules/', 'action=disable&m=' . urlencode($item->id)) : null),
+            'uninstall_link' => ($module->getName() != 'Core' ? URL::build('/panel/core/modules/', 'action=uninstall&m=' . urlencode($item->id)) : null),
+            'confirm_uninstall' => $language->get('admin', 'uninstall_confirm', ['item' => Output::getClean($module->getName())]),
             'enable_link' => (($module->getName() != 'Core' && !$item->enabled) ? URL::build('/panel/core/modules/', 'action=enable&m=' . urlencode($item->id)) : null),
             'enabled' => $item->enabled
         ];
@@ -127,12 +139,13 @@ if (!isset($_GET['action'])) {
         }
     }
 
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'INSTALL_MODULE' => $language->get('admin', 'install'),
         'INSTALL_MODULE_LINK' => URL::build('/panel/core/modules/', 'action=install'),
         'AUTHOR' => $language->get('admin', 'author'),
         'ENABLE' => $language->get('admin', 'enable'),
         'DISABLE' => $language->get('admin', 'disable'),
+        'UNINSTALL' => $language->get('admin', 'uninstall'),
         'MODULE_LIST' => $template_array,
         'FIND_MODULES' => $language->get('admin', 'find_modules'),
         'WEBSITE_MODULES' => $all_modules,
@@ -306,16 +319,16 @@ if (!isset($_GET['action'])) {
                                 $module->onInstall();
                             }
                         } catch (Exception $e) {
-                            $term = 'unable_to_load_module';
-
-                            if ($e->getMessage() == 'Translation file not found') {
-                                $term = 'unable_to_load_outdated_module';
-                            }
-
-                            $errors[] = $language->get('admin', $term, [
+                            $variables = [
                                 'message' => $e->getMessage(),
                                 'module' => Output::getClean($folders[count($folders) - 1]),
-                            ]);
+                            ];
+
+                            if ($e->getMessage() == 'Translation file not found') {
+                                $errors[] = $language->get('admin', 'unable_to_load_outdated_module', $variables);
+                            } else {
+                                $errors[] = $language->get('admin', 'unable_to_load_module', $variables);
+                            }
                         }
                     }
                 }
@@ -333,6 +346,63 @@ if (!isset($_GET['action'])) {
 
         Redirect::to(URL::build('/panel/core/modules'));
     }
+
+    if ($_GET['action'] === 'uninstall') {
+        // Uninstall a module
+        if (!isset($_GET['m']) || !is_numeric($_GET['m']) || $_GET['m'] == 1) {
+            die('Invalid module!');
+        }
+
+        if (Token::check($_POST['token'])) {
+            // Get module name
+            $name = DB::getInstance()->get('modules', ['id', $_GET['m']])->results();
+            $name = Output::getClean($name[0]->name);
+
+            foreach (Module::getModules() as $item) {
+                if (in_array($name, $item->getLoadAfter())) {
+                    // Unable to disable module
+                    Session::flash('admin_modules_error', $language->get('admin', 'unable_to_uninstall_module', ['module' => Output::getClean($item->getName())]));
+                    Redirect::to(URL::build('/panel/core/modules'));
+                }
+            }
+
+            DB::getInstance()->delete('modules', ['id', $_GET['m']]);
+
+            // Cache
+            $cache->setCache('modulescache');
+            $modules = [];
+
+            $order = Module::determineModuleOrder();
+
+            foreach ($order['modules'] as $key => $item) {
+                if ($item != $name) {
+                    $modules[] = [
+                        'name' => $item,
+                        'priority' => $key
+                    ];
+                }
+            }
+
+            // Store
+            $cache->store('enabled_modules', $modules);
+
+            if (file_exists(ROOT_PATH . '/modules/' . $name . '/init.php')) {
+                /** @var Module $module */
+                require_once(ROOT_PATH . '/modules/' . $name . '/init.php');
+                $module->onUninstall();
+            }
+
+            if (!Util::recursiveRemoveDirectory(ROOT_PATH . '/modules/' . $name)) {
+                Session::flash('admin_modules_error', $language->get('admin', 'unable_to_delete_module_files'));
+            }
+
+            Session::flash('admin_modules', $language->get('admin', 'module_uninstalled'));
+            Redirect::to(URL::build('/panel/core/modules'));
+
+        } else {
+            Session::flash('admin_modules_error', $language->get('general', 'invalid_token'));
+        }
+    }
 }
 
 if (Session::exists('admin_modules')) {
@@ -348,31 +418,32 @@ if (Session::exists('admin_modules_errors')) {
 }
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'MODULES' => $language->get('admin', 'modules'),
     'PAGE' => PANEL_PAGE,
     'TOKEN' => Token::get(),
-    'SUBMIT' => $language->get('general', 'submit')
+    'SUBMIT' => $language->get('general', 'submit'),
+    'CANCEL' => $language->get('general', 'cancel'),
 ]);
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('core/modules.tpl', $smarty);
+$template->displayTemplate('core/modules');

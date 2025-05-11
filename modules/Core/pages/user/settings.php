@@ -1,12 +1,21 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.1.0
+/**
+ * User settings page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  UserCP settings
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 // Must be logged in
@@ -17,12 +26,12 @@ if (!$user->isLoggedIn()) {
 // Always define page name for navbar
 const PAGE = 'cc_settings';
 $page_title = $language->get('user', 'user_cp');
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
 
 // Forum enabled?
 $forum_enabled = Util::isModuleEnabled('Forum');
 
-// Two factor auth?
+// Two-factor auth?
 if (isset($_GET['do'])) {
     if ($_GET['do'] == 'enable_tfa') {
 
@@ -31,22 +40,27 @@ if (isset($_GET['do'])) {
             Redirect::to(URL::build('/user/settings'));
         }
 
-        $tfa = new \RobThree\Auth\TwoFactorAuth(Output::getClean(SITE_NAME));
+        $tfa = new \RobThree\Auth\TwoFactorAuth(new \RobThree\Auth\Providers\Qr\QRServerProvider(), Output::getClean(SITE_NAME));
 
         if (!isset($_GET['s'])) {
-            // Generate secret
-            $secret = $tfa->createSecret();
 
-            $user->update([
-                'tfa_secret' => $secret
-            ]);
+            // Generate secret
+            $cache->setCache('users_tfa');
+            $secret = $cache->retrieve($user->data()->id);
+            if (!$secret) {
+                $secret = $tfa->createSecret();
+                $cache->store($user->data()->id, $secret, 60);
+                $user->update([
+                    'tfa_secret' => $secret
+                ]);
+            }
 
             if (Session::exists('force_tfa_alert')) {
                 $errors[] = Session::get('force_tfa_alert');
             }
 
-            // Assign Smarty variables
-            $smarty->assign([
+            // Assign template variables
+            $template->getEngine()->addVariables([
                 'TWO_FACTOR_AUTH' => $language->get('user', 'two_factor_auth'),
                 'TFA_SCAN_CODE_TEXT' => $language->get('user', 'tfa_scan_code'),
                 'IMG_SRC' => $tfa->getQRCodeImageAsDataUri(Output::getClean(SITE_NAME) . ':' . Output::getClean($user->data()->username), $secret),
@@ -61,9 +75,7 @@ if (isset($_GET['do'])) {
             ]);
 
             if (isset($errors) && count($errors)) {
-                $smarty->assign([
-                    'ERRORS' => $errors
-                ]);
+                $template->getEngine()->addVariable('ERRORS', $errors);
             }
         } else {
             // Validate code to see if it matches the secret
@@ -92,10 +104,10 @@ if (isset($_GET['do'])) {
             }
 
             if (isset($error)) {
-                $smarty->assign('ERROR', $error);
+                $template->getEngine()->addVariable('ERROR', $error);
             }
 
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'TWO_FACTOR_AUTH' => $language->get('user', 'two_factor_auth'),
                 'TFA_ENTER_CODE' => $language->get('user', 'tfa_enter_code'),
                 'SUBMIT' => $language->get('general', 'submit'),
@@ -106,11 +118,11 @@ if (isset($_GET['do'])) {
             ]);
         }
         Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
-        require(ROOT_PATH . '/core/templates/cc_navbar.php');
+        require ROOT_PATH . '/core/templates/cc_navbar.php';
         $template->onPageLoad();
-        require(ROOT_PATH . '/core/templates/navbar.php');
-        require(ROOT_PATH . '/core/templates/footer.php');
-        $template->displayTemplate('user/tfa.tpl', $smarty);
+        require ROOT_PATH . '/core/templates/navbar.php';
+        require ROOT_PATH . '/core/templates/footer.php';
+        $template->displayTemplate('user/tfa');
 
     } else {
         if ($_GET['do'] == 'disable_tfa') {
@@ -218,125 +230,112 @@ if (isset($_GET['do'])) {
                 ]);
 
                 if ($validation->passed()) {
-                    try {
-                        // Update language, template and timezone
-                        $new_language_results = DB::getInstance()->get('languages', ['name', Input::get('language')])->results();
+                    // Update language, template and timezone
+                    $new_language_results = DB::getInstance()->get('languages', ['name', Input::get('language')])->results();
 
-                        if (count($new_language_results)) {
-                            $new_language = $new_language_results[0]->id;
-                            $language = new Language('core', $new_language_results[0]->short_code);
+                    if (count($new_language_results)) {
+                        $new_language = $new_language_results[0]->id;
+                        $language = new Language('core', $new_language_results[0]->short_code);
+                    } else {
+                        $new_language = $user->data()->language_id;
+                    }
+
+                    // Template
+                    if (Input::get('template') != 0) {
+                        $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
+
+                        if (count($new_template)) {
+                            $new_template = $new_template[0]->id;
                         } else {
-                            $new_language = $user->data()->language_id;
+                            $new_template = $user_query->theme_id;
                         }
+                    } else {
+                        $new_template = null;
+                    }
 
-                        // Template
-                        if (Input::get('template') != 0) {
-                            $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
+                    // Check permissions
+                    $available_templates = $user->getUserTemplates();
 
-                            if (count($new_template)) {
-                                $new_template = $new_template[0]->id;
-                            } else {
-                                $new_template = $user_query->theme_id;
-                            }
+                    foreach ($available_templates as $available_template) {
+                        if ($available_template->id == $new_template) {
+                            $can_update = true;
+                            break;
+                        }
+                    }
+
+                    if (!isset($can_update)) {
+                        $new_template = $user->data()->theme_id;
+                    }
+
+                    $timezone = Input::get('timezone');
+
+                    if ($user->hasPermission('usercp.signature')) {
+                        $signature = Input::get('signature');
+                    } else {
+                        $signature = '';
+                    }
+
+                    // Private profiles enabled?
+                    $private_profiles = Settings::get('private_profile');
+                    if ($private_profiles === '1') {
+                        if ($user->canPrivateProfile() && $_POST['privateProfile'] == 1) {
+                            $privateProfile = 1;
                         } else {
-                            $new_template = null;
+                            $privateProfile = 0;
+                        }
+                    } else {
+                        $privateProfile = $user->data()->private_profile;
+                    }
+
+                    $gravatar = $_POST['gravatar'] == '1' ? 1 : 0;
+
+                    $data = [
+                        'language_id' => $new_language,
+                        'timezone' => $timezone,
+                        'signature' => $signature,
+                        'nickname' => $displayname,
+                        'private_profile' => $privateProfile,
+                        'theme_id' => $new_template,
+                        'gravatar' => $gravatar,
+                    ];
+
+                    if ($user->data()->register_method === 'authme' && Settings::get('authme')) {
+                        $data['authme_sync_password'] = Input::get('authmeSync');
+                    }
+
+                    $user->update($data);
+
+                    Log::getInstance()->log(Log::Action('user/ucp/update'));
+
+                    foreach ($_POST['profile_fields'] as $field_id => $value) {
+                        // Check field exists
+                        $field = ProfileField::find($field_id);
+                        if (!$field) {
+                            continue;
                         }
 
-                        // Check permissions
-                        $available_templates = $user->getUserTemplates();
-
-                        foreach ($available_templates as $available_template) {
-                            if ($available_template->id == $new_template) {
-                                $can_update = true;
-                                break;
-                            }
-                        }
-
-                        if (!isset($can_update)) {
-                            $new_template = $user->data()->theme_id;
-                        }
-
-                        $timezone = Input::get('timezone');
-
-                        if ($user->hasPermission('usercp.signature')) {
-                            $signature = Input::get('signature');
-                        } else {
-                            $signature = '';
-                        }
-
-                        // Private profiles enabled?
-                        $private_profiles = Settings::get('private_profile');
-                        if ($private_profiles === '1') {
-                            if ($user->canPrivateProfile() && $_POST['privateProfile'] == 1) {
-                                $privateProfile = 1;
-                            } else {
-                                $privateProfile = 0;
-                            }
-                        } else {
-                            $privateProfile = $user->data()->private_profile;
-                        }
-
-                        $gravatar = $_POST['gravatar'] == '1' ? 1 : 0;
-
-                        $data = [
-                            'language_id' => $new_language,
-                            'timezone' => $timezone,
-                            'signature' => $signature,
-                            'nickname' => $displayname,
-                            'private_profile' => $privateProfile,
-                            'theme_id' => $new_template,
-                            'gravatar' => $gravatar,
-                        ];
-
-                        if ($user->data()->register_method === 'authme' && Settings::get('authme')) {
-                            $data['authme_sync_password'] = Input::get('authmeSync');
-                        }
-
-                        // Is forum enabled? Update topic Updates
-                        if ($forum_enabled) {
-                            $topicUpdates = Input::get('topicUpdates');
-
-                            $data['topic_updates'] = $topicUpdates;
-                        }
-
-                        $user->update($data);
-
-                        Log::getInstance()->log(Log::Action('user/ucp/update'));
-
-                        foreach ($_POST['profile_fields'] as $field_id => $value) {
-                            // Check field exists
-                            $field = ProfileField::find($field_id);
-                            if (!$field) {
-                                continue;
-                            }
-
-                            $user_profile_fields = $user->getProfileFields(true);
-                            if (array_key_exists($field->id, $user_profile_fields) && $user_profile_fields[$field->id]->value !== null) {
-                                // Update field value if it has changed
-                                if ($value !== $user_profile_fields[$field->id]->value) {
-                                    DB::getInstance()->update('users_profile_fields', $user_profile_fields[$field->id]->upf_id, [
-                                        'value' => $value,
-                                        'updated' => date('U'),
-                                    ]);
-                                }
-                            } else {
-                                // Create new field value
-                                DB::getInstance()->insert('users_profile_fields', [
-                                    'user_id' => $user->data()->id,
-                                    'field_id' => $field->id,
+                        $user_profile_fields = $user->getProfileFields(true);
+                        if (array_key_exists($field->id, $user_profile_fields) && $user_profile_fields[$field->id]->value !== null) {
+                            // Update field value if it has changed
+                            if ($value !== $user_profile_fields[$field->id]->value) {
+                                DB::getInstance()->update('users_profile_fields', $user_profile_fields[$field->id]->upf_id, [
                                     'value' => $value,
                                     'updated' => date('U'),
                                 ]);
                             }
+                        } else {
+                            // Create new field value
+                            DB::getInstance()->insert('users_profile_fields', [
+                                'user_id' => $user->data()->id,
+                                'field_id' => $field->id,
+                                'value' => $value,
+                                'updated' => date('U'),
+                            ]);
                         }
-
-                        Session::flash('settings_success', $language->get('user', 'settings_updated_successfully'));
-                        Redirect::to(URL::build('/user/settings'));
-
-                    } catch (Exception $e) {
-                        Session::flash('settings_error', $e->getMessage());
                     }
 
+                    Session::flash('settings_success', $language->get('user', 'settings_updated_successfully'));
+                    Redirect::to(URL::build('/user/settings'));
                 } else {
                     $errors = $validation->errors();
                 }
@@ -474,6 +473,11 @@ if (isset($_GET['do'])) {
     $language_query = DB::getInstance()->get('languages', ['id', '<>', 0])->results();
 
     foreach ($language_query as $item) {
+        $language_path = implode(DIRECTORY_SEPARATOR, [ROOT_PATH, 'modules', 'Core', 'language', $item->short_code . '.json']);
+        if (!file_exists($language_path)) {
+            continue;
+        }
+
         $languages[] = [
             'name' => Output::getClean($item->name),
             'active' => $user->data()->language_id == $item->id
@@ -553,7 +557,7 @@ if (isset($_GET['do'])) {
     }
 
     if (isset($errors) && count($errors)) {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'ERRORS' => $errors,
             'ERRORS_TITLE' => $language->get('general', 'error')
         ]);
@@ -562,34 +566,25 @@ if (isset($_GET['do'])) {
     if ($user->hasPermission('usercp.signature')) {
         $signature = Output::getPurified($user->data()->signature);
 
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'SIGNATURE' => $language->get('user', 'signature'),
             'SIGNATURE_VALUE' => $signature
         ]);
     }
 
-    if ($forum_enabled) {
-        $smarty->assign([
-            'TOPIC_UPDATES' => $language->get('user', 'topic_updates'),
-            'TOPIC_UPDATES_ENABLED' => DB::getInstance()->get('users', ['id', $user->data()->id])->first()->topic_updates
-        ]);
-    }
-
     if ($user->canPrivateProfile()) {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'PRIVATE_PROFILE' => $language->get('user', 'private_profile'),
             'PRIVATE_PROFILE_ENABLED' => $user->isPrivateProfile()
         ]);
     }
 
     if (isset($error)) {
-        $smarty->assign([
-            'ERROR' => $error,
-        ]);
+        $template->getEngine()->addVariable('ERROR', $error);
     }
 
     // Language values
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SETTINGS' => $language->get('user', 'profile_settings'),
         'ACTIVE_LANGUAGE' => $language->get('user', 'active_language'),
         'LANGUAGES' => $languages,
@@ -621,7 +616,7 @@ if (isset($_GET['do'])) {
     ]);
 
     if (defined('CUSTOM_AVATARS')) {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'CUSTOM_AVATARS' => true,
             'CUSTOM_AVATARS_SCRIPT' => ((defined('CONFIG_PATH')) ? CONFIG_PATH . '/' : '/') . 'core/includes/image_upload.php',
             'BROWSE' => $language->get('general', 'browse'),
@@ -633,7 +628,7 @@ if (isset($_GET['do'])) {
     }
 
     if ($user->data()->tfa_enabled == 1) {
-        $smarty->assign('DISABLE', $language->get('user', 'disable'));
+        $template->getEngine()->addVariable('DISABLE', $language->get('user', 'disable'));
         foreach ($user->getGroups() as $group) {
             if ($group->force_tfa) {
                 $forced = true;
@@ -642,23 +637,24 @@ if (isset($_GET['do'])) {
         }
 
         if (isset($forced) && $forced) {
-            $smarty->assign('FORCED', true);
+            $template->getEngine()->addVariable('FORCED', true);
         } else {
-            $smarty->assign('DISABLE_LINK', URL::build('/user/settings/', 'do=disable_tfa'));
+            $template->getEngine()->addVariable('DISABLE_LINK', URL::build('/user/settings/', 'do=disable_tfa'));
         }
     } else {
         // Enable
-        $smarty->assign('ENABLE', $language->get('user', 'enable'));
-        $smarty->assign('ENABLE_LINK', URL::build('/user/settings/', 'do=enable_tfa'));
+        $template->getEngine()->addVariables([
+            'ENABLE' => $language->get('user', 'enable'),
+            'ENABLE_LINK' => URL::build('/user/settings/', 'do=enable_tfa'),
+        ]);
     }
 
     if ($user->data()->register_method && Settings::get('authme')) {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'AUTHME_SYNC_PASSWORD' => $language->get('user', 'authme_sync_password'),
-            'AUTHME_SYNC_PASSWORD_INFO' => $language->get('user', Settings::get('login_method') === 'username'
-                ? 'authme_sync_password_setting'
-                : 'authme_sync_password_setting_email'
-            ),
+            'AUTHME_SYNC_PASSWORD_INFO' => Settings::get('login_method') === 'username'
+                ? $language->get('user', 'authme_sync_password_setting')
+                : $language->get('user', 'authme_sync_password_setting_email'),
             'AUTHME_SYNC_PASSWORD_ENABLED' => $user->data()->authme_sync_password,
         ]);
     }
@@ -666,13 +662,13 @@ if (isset($_GET['do'])) {
     // Load modules + template
     Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
-    require(ROOT_PATH . '/core/templates/cc_navbar.php');
+    require ROOT_PATH . '/core/templates/cc_navbar.php';
 
     $template->onPageLoad();
 
-    require(ROOT_PATH . '/core/templates/navbar.php');
-    require(ROOT_PATH . '/core/templates/footer.php');
+    require ROOT_PATH . '/core/templates/navbar.php';
+    require ROOT_PATH . '/core/templates/footer.php';
 
     // Display template
-    $template->displayTemplate('user/settings.tpl', $smarty);
+    $template->displayTemplate('user/settings');
 }

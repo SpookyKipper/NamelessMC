@@ -1,12 +1,10 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.1.1
+/**
+ * NamelessMC Forum Module
  *
- *  License: MIT
- *
- *  Forum module file
+ * @author Samerton
+ * @version 2.3.0
+ * @license MIT
  */
 
 class Forum_Module extends Module {
@@ -19,9 +17,9 @@ class Forum_Module extends Module {
         $this->_forum_language = $forum_language;
 
         $name = 'Forum';
-        $author = '<a href="https://samerton.me" target="_blank" rel="nofollow noopener">Samerton</a>';
-        $module_version = '2.1.1';
-        $nameless_version = '2.1.1';
+        $author = '<a href="https://samerton.dev" target="_blank" rel="nofollow noopener">Samerton</a>';
+        $module_version = '2.2.1';
+        $nameless_version = '2.2.1';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
@@ -62,111 +60,57 @@ class Forum_Module extends Module {
         EventHandler::registerEvent(TopicReplyCreatedEvent::class);
 
         // -- Pipelines
+        EventHandler::registerEvent(PrePostCreateEvent::class);
+        EventHandler::registerEvent(PrePostEditEvent::class);
+        EventHandler::registerEvent(PreTopicCreateEvent::class);
+        EventHandler::registerEvent(PreTopicEditEvent::class);
 
-        EventHandler::registerEvent('prePostCreate',
-            $this->_forum_language->get('forum', 'pre_post_create_hook_info'),
-            [
-                'content' => $this->_language->get('general', 'content'),
-                'post_id' => $this->_forum_language->get('forum', 'post_id'),
-                'topic_id' => $this->_forum_language->get('forum', 'topic_id'),
-                'user' => $this->_forum_language->get('forum', 'user_object')
-            ],
-            true,
-            true
-        );
+        EventHandler::registerListener(PrePostCreateEvent::class, [MentionsHook::class, 'preCreate']);
+        EventHandler::registerListener(PrePostEditEvent::class, [MentionsHook::class, 'preEdit']);
+      
+        EventHandler::registerListener(PreTopicCreateEvent::class, [MentionsHook::class, 'preCreate']);
+        EventHandler::registerListener(PreTopicEditEvent::class, [MentionsHook::class, 'preEdit']);
 
-        EventHandler::registerEvent('prePostEdit',
-            $this->_forum_language->get('forum', 'pre_post_edit_hook_info'),
-            [
-                'content' => $this->_language->get('general', 'content'),
-                'post_id' => $this->_forum_language->get('forum', 'post_id'),
-                'topic_id' => $this->_forum_language->get('forum', 'topic_id'),
-                'user' => $this->_forum_language->get('forum', 'user_object')
-            ],
-            true,
-            true
-        );
+        if (Util::isModuleEnabled('Members')) {
+            MemberListManager::getInstance()->registerListProvider(new MostPostsMemberListProvider($forum_language));
+            MemberListManager::getInstance()->registerListProvider(new HighestForumReactionScoresMemberListProvider($forum_language));
 
-        EventHandler::registerEvent('preTopicCreate',
-            $this->_forum_language->get('forum', 'pre_topic_create_hook_info'),
-            [
-                'content' => $this->_language->get('general', 'content'),
-                'post_id' => $this->_forum_language->get('forum', 'post_id'),
-                'topic_id' => $this->_forum_language->get('forum', 'topic_id'),
-                'user' => $this->_forum_language->get('forum', 'user_object')
-            ],
-            true,
-            true
-        );
+            MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
+                return [
+                    $forum_language->get('forum', 'posts_title') =>
+                        DB::getInstance()->query(
+                            'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ?',
+                            [$member->data()->id]
+                        )->first()->count,
+                ];
+            });
 
-        EventHandler::registerEvent('preTopicEdit',
-            $this->_forum_language->get('forum', 'pre_topic_edit_hook_info'),
-            [
-                'content' => $this->_language->get('general', 'content'),
-                'post_id' => $this->_forum_language->get('forum', 'post_id'),
-                'topic_id' => $this->_forum_language->get('forum', 'topic_id'),
-                'topic_title' => $this->_forum_language->get('forum', 'topic_title'),
-                'user' => $this->_forum_language->get('forum', 'user_object')
-            ],
-            true,
-            true
-        );
-
-        EventHandler::registerEvent('renderPost',
-            $this->_forum_language->get('forum', 'render_post'),
-            [
-                'content' => $this->_language->get('general', 'content')
-            ],
-            true,
-            true
-        );
-
-        EventHandler::registerEvent('renderPostEdit',
-            $this->_forum_language->get('forum', 'render_post_edit'),
-            [
-                'content' => $this->_language->get('general', 'content')
-            ],
-            true,
-            true
-        );
-
-        EventHandler::registerListener('prePostCreate', 'MentionsHook::preCreate');
-        EventHandler::registerListener('prePostEdit', 'MentionsHook::preEdit');
-        EventHandler::registerListener('preTopicCreate', 'MentionsHook::preCreate');
-        EventHandler::registerListener('preTopicEdit', 'MentionsHook::preEdit');
-
-        EventHandler::registerListener('renderPost', 'ContentHook::purify');
-        EventHandler::registerListener('renderPost', 'ContentHook::renderEmojis', 10);
-        EventHandler::registerListener('renderPost', 'ContentHook::replaceAnchors', 5);
-        EventHandler::registerListener('renderPost', 'MentionsHook::parsePost', 5);
-
-        EventHandler::registerListener('renderPostEdit', 'ContentHook::purify');
-        EventHandler::registerListener('renderPostEdit', 'ContentHook::replaceAnchors', 15);
-
-        MemberListManager::getInstance()->registerListProvider(new MostPostsMemberListProvider($forum_language));
-        MemberListManager::getInstance()->registerListProvider(new HighestForumReactionScoresMemberListProvider($forum_language));
-
-        MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
-            return [
-                $forum_language->get('forum', 'posts_title') =>
-                    DB::getInstance()->query(
-                        'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ?',
-                        [$member->data()->id]
-                    )->first()->count,
-            ];
-        });
-
-        MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
-            return [
-                $forum_language->get('forum', 'reaction_score') =>
-                    DB::getInstance()->query(
-                        'SELECT COUNT(fr.user_received) AS `count` FROM nl2_forums_reactions fr JOIN nl2_reactions r ON r.id = fr.reaction_id WHERE r.type = 2 AND fr.user_received = ?',
-                        [$member->data()->id]
-                    )->first()->count,
-            ];
-        });
+            MemberListManager::getInstance()->registerMemberMetadataProvider(function (User $member) use ($forum_language) {
+                return [
+                    $forum_language->get('forum', 'reaction_score') =>
+                        DB::getInstance()->query(
+                            'SELECT COUNT(fr.user_received) AS `count` FROM nl2_forums_reactions fr JOIN nl2_reactions r ON r.id = fr.reaction_id WHERE r.type = 2 AND fr.user_received = ?',
+                            [$member->data()->id]
+                        )->first()->count,
+                ];
+            });
+        }
 
         ReactionContextsManager::getInstance()->provideContext(new ForumPostReactionContext($forum_language));
+
+        Notification::addType(
+            'forum_topic_reply',
+            $forum_language->get('forum', 'forum_topic_replies'),
+            Module::getIdFromName('Forum'),
+            ['alert' => true, 'email' => true],
+        );
+
+        Notification::addType(
+            'forum_topic_mention',
+            $forum_language->get('forum', 'forum_topic_mentions'),
+            Module::getIdFromName('Forum'),
+            ['alert' => true, 'email' => true],
+        );
     }
 
     public function onInstall() {
@@ -185,7 +129,15 @@ class Forum_Module extends Module {
         // No actions necessary
     }
 
-    public function onPageLoad($user, $pages, $cache, $smarty, $navs, $widgets, $template) {
+    public function onPageLoad(
+        User $user,
+        Pages $pages,
+        Cache $cache,
+        $smarty,
+        iterable $navs,
+        Widgets $widgets,
+        TemplateBase $template
+    ) {
         // AdminCP
         PermissionHandler::registerPermissions('Forum', [
             'admincp.forums' => $this->_language->get('moderator', 'staff_cp') . ' &raquo; ' . $this->_forum_language->get('forum', 'forum')
@@ -236,7 +188,7 @@ class Forum_Module extends Module {
         // Widgets
         if ($pages->getActivePage()['widgets'] || (defined('PANEL_PAGE') && str_contains(PANEL_PAGE, 'widget'))) {
             // Latest posts
-            $widgets->add(new LatestPostsWidget($this->_forum_language, $smarty, $cache, $user, $this->_language));
+            $widgets->add(new LatestPostsWidget($this->_forum_language, $template->getEngine(), $cache, $user, $this->_language));
         }
 
         // Front end or back end?
@@ -248,20 +200,22 @@ class Forum_Module extends Module {
                 $topic_count = count($topic_count);
                 $post_count = DB::getInstance()->get('posts', ['post_creator', $user->data()->id])->results();
                 $post_count = count($post_count);
-                $smarty->assign('LOGGED_IN_USER_FORUM', [
+                $template->getEngine()->addVariable('LOGGED_IN_USER_FORUM', [
                     'topic_count' => $topic_count,
                     'post_count' => $post_count
                 ]);
             }
 
             if (defined('PAGE') && PAGE == 'user_query') {
-                $user_id = $smarty->getTemplateVars('USER_ID');
+                $user_id = $template->getEngine()->getVariable('USER_ID');
 
                 if ($user_id) {
                     $forum = new Forum();
 
-                    $smarty->assign('TOPICS', $this->_forum_language->get('forum', 'x_topics', ['count' => $forum->getTopicCount($user_id)]));
-                    $smarty->assign('POSTS', $this->_forum_language->get('forum', 'x_posts', ['count' => $forum->getPostCount($user_id)]));
+                    $template->getEngine()->addVariables([
+                        'TOPICS' => $this->_forum_language->get('forum', 'x_topics', ['count' => $forum->getTopicCount($user_id)]),
+                        'POSTS' => $this->_forum_language->get('forum', 'x_posts', ['count' => $forum->getPostCount($user_id)])
+                    ]);
                 }
             }
 
@@ -376,11 +330,11 @@ class Forum_Module extends Module {
                     Core_Module::addDataToDashboardGraph($this->_language->get('admin', 'overview'), $data);
 
                     // Dashboard stats
-                    require_once(ROOT_PATH . '/modules/Forum/collections/panel/RecentTopics.php');
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($smarty, $this->_forum_language, $cache, $latest_topics_count));
+                    require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentTopics.php';
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($template->getEngine(), $this->_forum_language, $cache, $latest_topics_count));
 
-                    require_once(ROOT_PATH . '/modules/Forum/collections/panel/RecentPosts.php');
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($smarty, $this->_forum_language, $cache, $latest_posts_count));
+                    require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentPosts.php';
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($template->getEngine(), $this->_forum_language, $cache, $latest_posts_count));
 
                 }
             }

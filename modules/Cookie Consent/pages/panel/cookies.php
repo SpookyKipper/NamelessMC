@@ -1,16 +1,26 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr12
+/**
+ * Staff panel cookies page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel cookies page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $cookie_language
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.cookies')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,7 +28,7 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'cookie_divider';
 const PANEL_PAGE = 'cookie_settings';
 $page_title = $cookie_language->get('cookie', 'cookies');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 if (Input::exists()) {
     $errors = [];
@@ -34,25 +44,21 @@ if (Input::exists()) {
         ]);
 
         if ($validation->passed()) {
-            try {
-                $cookie_id = DB::getInstance()->get('privacy_terms', ['name', 'cookies'])->results();
-                if (count($cookie_id)) {
-                    $cookie_id = $cookie_id[0]->id;
+            $cookie_id = DB::getInstance()->get('privacy_terms', ['name', 'cookies'])->results();
+            if (count($cookie_id)) {
+                $cookie_id = $cookie_id[0]->id;
 
-                    DB::getInstance()->update('privacy_terms', $cookie_id, [
-                        'value' => Input::get('cookies')
-                    ]);
-                } else {
-                    DB::getInstance()->insert('privacy_terms', [
-                        'name' => 'cookies',
-                        'value' => Input::get('cookies')
-                    ]);
-                }
-
-                $success = $cookie_language->get('cookie', 'cookie_notice_success');
-            } catch (Exception $e) {
-                $errors[] = $e->getMessage();
+                DB::getInstance()->update('privacy_terms', $cookie_id, [
+                    'value' => Input::get('cookies')
+                ]);
+            } else {
+                DB::getInstance()->insert('privacy_terms', [
+                    'name' => 'cookies',
+                    'value' => Input::get('cookies')
+                ]);
             }
+
+            $success = $cookie_language->get('cookie', 'cookie_notice_success');
         } else {
             $errors = $validation->errors();
         }
@@ -65,23 +71,23 @@ if (Input::exists()) {
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
 // Get cookie notice
 $cookies = DB::getInstance()->query('SELECT value FROM nl2_privacy_terms WHERE `name` = ?', ['cookies'])->first()->value;
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'COOKIES' => $cookie_language->get('cookie', 'cookies'),
@@ -94,7 +100,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('cookies/cookies.tpl', $smarty);
+$template->displayTemplate('cookies/cookies');

@@ -1,16 +1,25 @@
 <?php
-/*
- *  Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.0.0-pr9
+/**
+ * Staff panel avatars page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  Panel avatars page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 if (!$user->handlePanelPageLoad('admincp.core.avatars')) {
-    require_once(ROOT_PATH . '/403.php');
+    require_once ROOT_PATH . '/403.php';
     die();
 }
 
@@ -18,37 +27,27 @@ const PAGE = 'panel';
 const PARENT_PAGE = 'core_configuration';
 const PANEL_PAGE = 'avatars';
 $page_title = $language->get('admin', 'avatars');
-require_once(ROOT_PATH . '/core/templates/backend_init.php');
+require_once ROOT_PATH . '/core/templates/backend_init.php';
 
 // Input
 if (Input::exists()) {
     if (Token::check()) {
         if (isset($_POST['avatar_source'])) {
-            try {
-                Settings::set('user_avatars', $custom_avatars = (isset($_POST['custom_avatars']) && $_POST['custom_avatars']) ? '1' : '0');
-                Settings::set('default_avatar_type', Input::get('default_avatar'));
-                Settings::set('avatar_site', Input::get('avatar_source'));
-                Settings::set('avatar_type', Input::get('avatar_perspective'));
+            Settings::set('user_avatars', $custom_avatars = (isset($_POST['custom_avatars']) && $_POST['custom_avatars']) ? '1' : '0');
+            Settings::set('default_avatar_type', Input::get('default_avatar'));
+            Settings::set('avatar_site', Input::get('avatar_source'));
+            Settings::set('avatar_type', Input::get('avatar_perspective'));
 
-                $cache->setCache('avatar_settings_cache');
-                $cache->store('custom_avatars', $custom_avatars);
-                $cache->store('default_avatar_type', Input::get('default_avatar'));
-                $cache->store('avatar_source', Input::get('avatar_source'));
-                $cache->store('avatar_perspective', Input::get('avatar_perspective'));
-            } catch (Exception $e) {
-                $errors = [$e->getMessage()];
-            }
-        } else {
-            if (isset($_POST['avatar'])) {
-                // Selecting a new default avatar
-                try {
-                    Settings::set('custom_default_avatar', Input::get('avatar'));
-                    $cache->setCache('avatar_settings_cache');
-                    $cache->store('default_avatar_image', Input::get('avatar'));
-                } catch (Exception $e) {
-                    $errors = [$e->getMessage()];
-                }
-            }
+            $cache->setCache('avatar_settings_cache');
+            $cache->store('custom_avatars', $custom_avatars);
+            $cache->store('default_avatar_type', Input::get('default_avatar'));
+            $cache->store('avatar_source', Input::get('avatar_source'));
+            $cache->store('avatar_perspective', Input::get('avatar_perspective'));
+        } else if (isset($_POST['avatar'])) {
+            // Selecting a new default avatar
+            Settings::set('custom_default_avatar', Input::get('avatar'));
+            $cache->setCache('avatar_settings_cache');
+            $cache->store('default_avatar_image', Input::get('avatar'));
         }
 
         //Log::getInstance()->log(Log::Action('admin/core/avatar'));
@@ -65,23 +64,23 @@ if (Input::exists()) {
 Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
 if (isset($success)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => $success,
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (Session::exists('avatar_success')) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'SUCCESS' => Session::flash('avatar_success'),
-        'SUCCESS_TITLE' => $language->get('general', 'success')
+        'SUCCESS_TITLE' => $language->get('general', 'success'),
     ]);
 }
 
 if (isset($errors) && count($errors)) {
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'ERRORS' => $errors,
-        'ERRORS_TITLE' => $language->get('general', 'error')
+        'ERRORS_TITLE' => $language->get('general', 'error'),
     ]);
 }
 
@@ -103,7 +102,7 @@ if (count($images)) {
     }
 }
 
-$smarty->assign([
+$template->getEngine()->addVariables([
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'CONFIGURATION' => $language->get('admin', 'configuration'),
@@ -138,7 +137,7 @@ $smarty->assign([
 
 $template->onPageLoad();
 
-require(ROOT_PATH . '/core/templates/panel_navbar.php');
+require ROOT_PATH . '/core/templates/panel_navbar.php';
 
 // Display template
-$template->displayTemplate('core/avatars.tpl', $smarty);
+$template->displayTemplate('core/avatars');

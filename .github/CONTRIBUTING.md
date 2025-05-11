@@ -38,6 +38,20 @@ Here are some things you should know when contributing:
       ```console
       vendor/bin/phinx migrate -c core/migrations/phinx.php
       ```
+- To test emails locally, we reccommend using [MailHog](https://github.com/mailhog/MailHog) - it allows you to view emails sent from your local server without actually sending them to a recipient.
+    - Tweak your `core/config.php` file to use MailHog as the SMTP server:
+        ```php
+        'email' => [
+          'email' => '<some address, outgoing>',
+          'username' => '',
+          'password' => '',
+          'name' => '',
+          'host' => 'localhost',
+          'port' => 1025,
+          'smtp_auth' => false,
+          'secure' => '',
+        ],
+        ```
 
 ## Versioning
 As of NamelessMC 2.0.0, we use a unique versioning system.
@@ -79,7 +93,7 @@ Deprecations rule of thumb:
 After adding a new module to core, you need to do the following:
 1. Update the `Dockerfile.phpdoc` file to include the new module classes folder (this generates our [PHPDoc](https://phpdoc.namelessmc.com/) site)
 2. Update `composer.json` to autoload the new module classes folder
-3. Add a new term to the `custom/languages/en_UK.json` file for the module description to be shown during instal
+3. Add a new term to the `modules/Core/language/en_UK.json` file for the module description to be shown during instal
     - The term should be in the format `module_{module_name}_description`
     - Don't forget to add it to the `WHITELISTED_TERMS` array in `dev/scripts/find_unused_language_terms.sh`
 4. Create new database entry to install it by default
