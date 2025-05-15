@@ -109,108 +109,116 @@ if (Input::exists()) {
                 },
             ]);
 
-            if ($validation->passed()) {
-                // Get default language ID before creating user
-                $language_id = DB::getInstance()->get('languages', ['short_code', LANGUAGE]);
+            $pre_registration_event = EventHandler::executeEvent(new PreUserRegistrationEvent(
+                $_POST,
+            ));
 
-                if ($language_id->count()) {
-                    $language_id = $language_id->first()->id;
-                } else {
-                    // fallback to EnglishUK
-                    $language_id = DB::getInstance()->get('languages', ['short_code', 'en_UK'])->first()->id;
-                }
+            if (!$pre_registration_event->isCancelled()) {
+                if ($validation->passed()) {
+                    // Get default language ID before creating user
+                    $language_id = DB::getInstance()->get('languages', ['short_code', LANGUAGE]);
 
-                if (!filter_var($ip = HttpUtils::getRemoteAddress(), FILTER_VALIDATE_IP)) {
-                    $ip = $_SESSION['authme']['ip'];
-                }
-
-                $mcname = Output::getClean($_SESSION['authme']['username']);
-                if (Settings::get('displaynames') === '1') {
-                    $nickname = Input::get('nickname');
-                } else {
-                    $nickname = $mcname;
-                }
-
-                // Add username back to post for integration handling
-                $_POST['username'] = $mcname;
-
-                $integration = Integrations::getInstance()->getIntegration('Minecraft');
-                $integration->afterRegistrationValidation();
-
-                if (count($integration->getErrors())) {
-                    $errors = $integration->getErrors();
-                } else {
-                    // Generate validation code
-                    $code = SecureRandom::alphanumeric();
-                    $email = Output::getClean(Input::get('email'));
-
-                    $user->create([
-                        'username' => $mcname,
-                        'nickname' => $nickname,
-                        'password' => $_SESSION['authme']['pass'],
-                        'pass_method' => $_SESSION['authme']['hash'],
-                        'joined' => date('U'),
-                        'email' => $email,
-                        'reset_code' => $code,
-                        'lastip' => $ip,
-                        'last_online' => date('U'),
-                        'language_id' => $language_id,
-                        'register_method' => 'authme',
-                        'authme_sync_password' => Input::get('authme_sync_password') === 'on',
-                    ]);
-
-                    // Get user ID
-                    $user_id = DB::getInstance()->lastId();
-
-                    // Get default group ID
-                    $cache->setCache('default_group');
-                    if ($cache->isCached('default_group')) {
-                        $default_group = $cache->retrieve('default_group');
+                    if ($language_id->count()) {
+                        $language_id = $language_id->first()->id;
                     } else {
-                        $default_group = Group::find(1, 'default_group')->id;
-
-                        $cache->store('default_group', $default_group);
+                        // fallback to EnglishUK
+                        $language_id = DB::getInstance()->get('languages', ['short_code', 'en_UK'])->first()->id;
                     }
 
-                    $user = new User($user_id);
-                    $user->addGroup($default_group);
+                    if (!filter_var($ip = HttpUtils::getRemoteAddress(), FILTER_VALIDATE_IP)) {
+                        $ip = $_SESSION['authme']['ip'];
+                    }
 
-                    EventHandler::executeEvent(new UserRegisteredEvent(
-                        $user,
-                    ));
+                    $mcname = Output::getClean($_SESSION['authme']['username']);
+                    if (Settings::get('displaynames') === '1') {
+                        $nickname = Input::get('nickname');
+                    } else {
+                        $nickname = $mcname;
+                    }
 
-                    // Link the minecraft integration
-                    $integration->successfulRegistration($user);
+                    // Add username back to post for integration handling
+                    $_POST['username'] = $mcname;
 
-                    // Custom Fields
-                    foreach ($_POST['profile_fields'] as $field_id => $value) {
-                        if (!empty($value)) {
-                            // Insert custom field
-                            DB::getInstance()->insert('users_profile_fields', [
-                                'user_id' => $user_id,
-                                'field_id' => $field_id,
-                                'value' => $value,
-                                'updated' => date('U'),
-                            ]);
+                    $integration = Integrations::getInstance()->getIntegration('Minecraft');
+                    $integration->afterRegistrationValidation();
+
+                    if (count($integration->getErrors())) {
+                        $errors = $integration->getErrors();
+                    } else {
+                        // Generate validation code
+                        $code = SecureRandom::alphanumeric();
+                        $email = Output::getClean(Input::get('email'));
+
+                        $user->create([
+                            'username' => $mcname,
+                            'nickname' => $nickname,
+                            'password' => $_SESSION['authme']['pass'],
+                            'pass_method' => $_SESSION['authme']['hash'],
+                            'joined' => date('U'),
+                            'email' => $email,
+                            'reset_code' => $code,
+                            'lastip' => $ip,
+                            'last_online' => date('U'),
+                            'language_id' => $language_id,
+                            'register_method' => 'authme',
+                            'authme_sync_password' => Input::get('authme_sync_password') === 'on',
+                        ]);
+
+                        // Get user ID
+                        $user_id = DB::getInstance()->lastId();
+
+                        // Get default group ID
+                        $cache->setCache('default_group');
+                        if ($cache->isCached('default_group')) {
+                            $default_group = $cache->retrieve('default_group');
+                        } else {
+                            $default_group = Group::find(1, 'default_group')->id;
+
+                            $cache->store('default_group', $default_group);
+                        }
+
+                        $user = new User($user_id);
+                        $user->addGroup($default_group);
+
+                        EventHandler::executeEvent(new UserRegisteredEvent(
+                            $user,
+                        ));
+
+                        // Link the minecraft integration
+                        $integration->successfulRegistration($user);
+
+                        // Custom Fields
+                        foreach ($_POST['profile_fields'] as $field_id => $value) {
+                            if (!empty($value)) {
+                                // Insert custom field
+                                DB::getInstance()->insert('users_profile_fields', [
+                                    'user_id' => $user_id,
+                                    'field_id' => $field_id,
+                                    'value' => $value,
+                                    'updated' => date('U'),
+                                ]);
+                            }
+                        }
+
+                        unset($_SESSION['authme']);
+
+                        if (Settings::get('email_verification') === '1') {
+                            // Send registration email
+                            Core_Emails::sendRegisterEmail($language, $email, $mcname, $user_id, $code);
+
+                            Session::flash('home', $language->get('user', 'registration_check_email'));
+                            Redirect::to(URL::build('/'));
+                        } else {
+                            // Redirect straight to verification link
+                            Redirect::to(URL::build('/validate/', 'c=' . urlencode($code)));
                         }
                     }
-
-                    unset($_SESSION['authme']);
-
-                    if (Settings::get('email_verification') === '1') {
-                        // Send registration email
-                        Core_Emails::sendRegisterEmail($language, $email, $mcname, $user_id, $code);
-
-                        Session::flash('home', $language->get('user', 'registration_check_email'));
-                        Redirect::to(URL::build('/'));
-                    } else {
-                        // Redirect straight to verification link
-                        Redirect::to(URL::build('/validate/', 'c=' . urlencode($code)));
-                    }
+                } else {
+                    // Validation errors
+                    $errors = $validation->errors();
                 }
             } else {
-                // Validation errors
-                $errors = $validation->errors();
+                $errors = [$pre_registration_event->getCancelledReason()];
             }
         } else {
             // Step 1
