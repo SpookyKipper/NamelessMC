@@ -46,7 +46,7 @@ class Upgrade extends Task
         } else {
             $this->setOutput(['unzip' => "Extracting upgrade zip: {$zip->getStatusString()}"]);
         }
-        $zip->extractTo(ROOT_PATH . '/upgrade-test');
+        $zip->extractTo(ROOT_PATH);
         $zip->close();
 
         // 4. Delete the upgrade zip
