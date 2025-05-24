@@ -105,7 +105,6 @@ if (Session::exists('backup_error')) {
 }
 
 $template->getEngine()->addVariables([
-    'TOKEN' => Token::get(),
     'PARENT_PAGE' => PARENT_PAGE,
     'DASHBOARD' => $language->get('admin', 'dashboard'),
     'CONFIGURATION' => $language->get('admin', 'configuration'),
