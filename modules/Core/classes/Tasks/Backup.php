@@ -197,7 +197,7 @@ class Backup extends Task
         return true;
     }
 
-    private function deleteFolder(string $folder)
+    private function deleteFolder(string $folder): void
     {
         if (!is_dir($folder)) {
             return;
@@ -208,13 +208,13 @@ class Backup extends Task
             is_dir("$folder/$file") ? $this->deleteFolder("$folder/$file") : unlink("$folder/$file");
         }
 
-        return rmdir($folder);
+        rmdir($folder);
     }
 
     /**
      * Clean up old backups based on the max retention setting
      */
-    private function cleanupOldBackups($backupsFolder, $maxRetention): void
+    private function cleanupOldBackups(string $backupsFolder, int $maxRetention): void
     {
         $backupFiles = glob($backupsFolder . 'nameless_backup_*.zip');
 
@@ -222,7 +222,7 @@ class Backup extends Task
             return;
         }
 
-        usort($backupFiles, function($a, $b) {
+        usort($backupFiles, function ($a, $b) {
             return filemtime($b) - filemtime($a);
         });
 
@@ -242,14 +242,7 @@ class Backup extends Task
     public static function scheduleNextDailyBackup(): void
     {
         // Cancel any existing scheduled daily backups to avoid duplicates
-        $existingTasks = DB::getInstance()->query(
-            'SELECT id FROM nl2_queue WHERE `task` = ? AND `name` = ? AND `status` = ?',
-            [Backup::class, self::DAILY_BACKUP, 'ready']
-        )->results();
-
-        foreach ($existingTasks as $task) {
-            DB::getInstance()->delete('queue', ['id', $task->id]);
-        }
+        self::unscheduleNextDailyBackup();
 
         // Schedule new daily backup for tomorrow
         $task = (new Backup())->fromNew(
