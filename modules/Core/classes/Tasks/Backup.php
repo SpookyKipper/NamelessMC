@@ -19,11 +19,17 @@ class Backup extends Task
      */
     public function run(): string
     {
+        $backupsFolder = ROOT_PATH . '/backups/';
+
+        if (!$this->backupsFolderWritable($backupsFolder)) {
+            return Task::STATUS_ERROR;
+        }
+
         if (!$this->ensureHasDiskSpace()) {
             return Task::STATUS_ERROR;
         }
 
-        $tempBackupFolder = ROOT_PATH . '/backups/' . date('Y-m-d_H-i-s') . '/';
+        $tempBackupFolder = $backupsFolder . date('Y-m-d_H-i-s') . '/';
         if (!is_dir($tempBackupFolder)) {
             mkdir($tempBackupFolder, 0755, true);
         }
@@ -37,6 +43,18 @@ class Backup extends Task
         }
 
         return Task::STATUS_COMPLETED;
+    }
+
+    private function backupsFolderWritable(string $backupsFolder): bool
+    {
+        if (!is_writable($backupsFolder)) {
+            $this->setOutput([
+                'error' => $backupsFolder . ' is not writable. Please check permissions.',
+            ]);
+            return false;
+        }
+
+        return true;
     }
 
     private function ensureHasDiskSpace(): bool
@@ -65,7 +83,7 @@ class Backup extends Task
         return true;
     }
 
-    private function backupDatabase($tempBackupFolder): bool
+    private function backupDatabase(string $tempBackupFolder): bool
     {
         $dbConfig = Config::get('mysql');
         $dbHost = $dbConfig['host'];
@@ -88,7 +106,7 @@ class Backup extends Task
         return true;
     }
 
-    private function backupFiles($tempBackupFolder): bool
+    private function backupFiles(string $tempBackupFolder): bool
     {
         $source = ROOT_PATH . '/';
         $destination = $tempBackupFolder . 'nameless/';
@@ -134,7 +152,7 @@ class Backup extends Task
             $this->setOutput([
                 'error' => 'Failed to create zip archive',
             ]);
-            $this->deleteDirectory($tempBackupFolder);
+            $this->deleteFolder($tempBackupFolder);
             return false;
         }
 
@@ -153,7 +171,7 @@ class Backup extends Task
         $zip->close();
 
         // Clean up the temporary backup folder
-        $this->deleteDirectory($tempBackupFolder);
+        $this->deleteFolder($tempBackupFolder);
 
         $this->setOutput([
             'result' => 'Backup created successfully',
@@ -163,17 +181,17 @@ class Backup extends Task
         return true;
     }
 
-    private function deleteDirectory($dir)
+    private function deleteFolder(string $folder)
     {
-        if (!is_dir($dir)) {
+        if (!is_dir($folder)) {
             return;
         }
 
-        $files = array_diff(scandir($dir), ['.', '..']);
+        $files = array_diff(scandir($folder), ['.', '..']);
         foreach ($files as $file) {
-            is_dir("$dir/$file") ? $this->deleteDirectory("$dir/$file") : unlink("$dir/$file");
+            is_dir("$folder/$file") ? $this->deleteFolder("$folder/$file") : unlink("$folder/$file");
         }
 
-        return rmdir($dir);
+        return rmdir($folder);
     }
 }
