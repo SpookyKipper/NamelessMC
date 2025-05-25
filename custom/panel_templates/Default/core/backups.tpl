@@ -78,7 +78,7 @@
                                                     <td>{$backup.date}</td>
                                                     <td>{$backup.size}</td>
                                                     <td>
-                                                        <a href="{$backup.download_link}" class="btn btn-sm btn-primary">
+                                                        <a href="{$backup.download_link}" target="_blank" class="btn btn-sm btn-primary">
                                                             <i class="fa fa-download"></i> {$DOWNLOAD}
                                                         </a>
                                                     </td>
