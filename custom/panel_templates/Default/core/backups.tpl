@@ -58,9 +58,9 @@
                             <br />
 
                             <!-- Existing Backups -->
-                            <h5>{if isset($EXISTING_BACKUPS) && count($EXISTING_BACKUPS) > 0}Existing Backups{/if}</h5>
-
                             {if isset($EXISTING_BACKUPS) && count($EXISTING_BACKUPS) > 0}
+                                <h5>{$EXISTING}</h5>
+
                                 <div class="table-responsive">
                                     <table class="table table-striped table-hover">
                                         <thead>
@@ -92,7 +92,6 @@
                                     <i class="fa fa-info-circle"></i> {$NO_BACKUPS}
                                 </div>
                             {/if}
-
                         </div>
                     </div>
 

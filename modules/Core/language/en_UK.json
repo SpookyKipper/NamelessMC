@@ -56,6 +56,7 @@
     "admin/file_size": "File Size",
     "admin/filename": "Filename",
     "admin/no_backups": "No backups found. Create your first backup to get started.",
+    "admin/existing_backups": "Existing Backups",
     "admin/background_colour": "Background Colour",
     "admin/background_colour_required": "Background Colour is required",
     "admin/ban_hook_info": "User banned",

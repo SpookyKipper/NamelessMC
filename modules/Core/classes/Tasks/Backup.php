@@ -19,6 +19,10 @@ class Backup extends Task
      */
     public function run(): string
     {
+        if (!$this->ensureHasDiskSpace()) {
+            return Task::STATUS_ERROR;
+        }
+
         $tempBackupFolder = ROOT_PATH . '/backups/' . date('Y-m-d_H-i-s') . '/';
         if (!is_dir($tempBackupFolder)) {
             mkdir($tempBackupFolder, 0755, true);
@@ -35,6 +39,32 @@ class Backup extends Task
         return Task::STATUS_COMPLETED;
     }
 
+    private function ensureHasDiskSpace(): bool
+    {
+        $dbConfig = Config::get('mysql');
+        $dbName = $dbConfig['db'];
+
+        // Get the size of the database
+        $sizeQuery = DB::getInstance()->query("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size FROM information_schema.TABLES WHERE table_schema = ?", [$dbName]);
+        $databaseSizeEstimate = $sizeQuery->first()->size ?? 0;
+        $databaseSizeEstimate = $databaseSizeEstimate * 1024 * 1024;
+
+        // ~50 MB for files, mostly due to the possibility of many image uploads
+        $fileSizeEstimate = 50 * 1024 * 1024;
+
+        $totalEstimatedSize = $databaseSizeEstimate + $fileSizeEstimate;
+        $freeSpace = disk_free_space(ROOT_PATH);
+
+        if ($totalEstimatedSize > $freeSpace) {
+            $this->setOutput([
+                'error' => 'Not enough disk space for backup. Estimated size: ' . Util::formatBytes($totalEstimatedSize) . ', free space: ' . Util::formatBytes($freeSpace),
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
     private function backupDatabase($tempBackupFolder): bool
     {
         $dbConfig = Config::get('mysql');
@@ -44,6 +74,7 @@ class Backup extends Task
         $dbUsername = $dbConfig['username'];
         $dbPassword = $dbConfig['password'];
 
+        // Dump the database to the temporary folder
         try {
             $dump = new Mysqldump("mysql:host={$dbHost};port={$dbPort};dbname={$dbName}", $dbUsername, $dbPassword);
             $dump->start($tempBackupFolder . 'database.sql');
@@ -121,6 +152,7 @@ class Backup extends Task
         }
         $zip->close();
 
+        // Clean up the temporary backup folder
         $this->deleteDirectory($tempBackupFolder);
 
         $this->setOutput([
@@ -139,7 +171,7 @@ class Backup extends Task
 
         $files = array_diff(scandir($dir), ['.', '..']);
         foreach ($files as $file) {
-            (is_dir("$dir/$file")) ? $this->deleteDirectory("$dir/$file") : unlink("$dir/$file");
+            is_dir("$dir/$file") ? $this->deleteDirectory("$dir/$file") : unlink("$dir/$file");
         }
 
         return rmdir($dir);

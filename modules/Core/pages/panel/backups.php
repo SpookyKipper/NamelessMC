@@ -79,7 +79,7 @@ if (is_dir($backups_dir)) {
         foreach ($backup_files as $backup_file) {
             $backups[] = [
                 'filename' => basename($backup_file),
-                'date' => date('d M Y, H:i', filemtime($backup_file)),
+                'date' => date(DATE_FORMAT, filemtime($backup_file)),
                 'size' => Util::formatBytes(filesize($backup_file)),
                 'download_link' => URL::build('/panel/core/backups', 'download=' . urlencode(basename($backup_file))),
             ];
@@ -124,6 +124,7 @@ $template->getEngine()->addVariables([
     'FILE_SIZE' => $language->get('admin', 'file_size'),
     'DOWNLOAD' => $language->get('admin', 'download'),
     'INFO' => $language->get('general', 'info'),
+    'EXISTING' => $language->get('admin', 'existing_backups'),
 ]);
 
 $template->onPageLoad();
