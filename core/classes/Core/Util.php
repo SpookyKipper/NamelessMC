@@ -312,7 +312,7 @@ class Util
      */
     public static function formatBytes(int $bytes): string
     {
-        $sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $sizes = ['b', 'Kb', 'Mb', 'Gb', 'Tb'];
         $factor = floor((strlen($bytes) - 1) / 3);
 
         return sprintf("%.2f", $bytes / pow(1024, $factor)) . ' ' . $sizes[$factor];
