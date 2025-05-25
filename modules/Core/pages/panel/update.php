@@ -91,16 +91,14 @@ if (!is_string($update_check)) {
                         return filemtime($b) - filemtime($a);
                     });
 
-                    if (!empty($backup_files)) {
-                        $latest_backup = [
-                            'filename' => basename($backup_files[0]),
-                            'date' => date(DATE_FORMAT, filemtime($backup_files[0])),
-                            'date_formatted' => $language->get('admin', 'backup_created', [
-                                'ago' => (new TimeAgo(TIMEZONE))->inWords(date(DATE_FORMAT, filemtime($backup_files[0])), $language)
-                            ]),
-                            'timestamp' => filemtime($backup_files[0])
-                        ];
-                    }
+                    $latest_backup = [
+                        'filename' => basename($backup_files[0]),
+                        'date' => date(DATE_FORMAT, filemtime($backup_files[0])),
+                        'date_formatted' => $language->get('admin', 'backup_created', [
+                            'ago' => (new TimeAgo(TIMEZONE))->inWords(date(DATE_FORMAT, filemtime($backup_files[0])), $language)
+                        ]),
+                        'timestamp' => filemtime($backup_files[0])
+                    ];
                 }
             }
 
