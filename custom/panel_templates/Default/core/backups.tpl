@@ -99,7 +99,7 @@
                                                 <th>{$FILENAME}</th>
                                                 <th>{$DATE_CREATED}</th>
                                                 <th>{$FILE_SIZE}</th>
-                                                <th>Actions</th>
+                                                <th>{$ACTIONS}</th>
                                             </tr>
                                         </thead>
                                         <tbody>

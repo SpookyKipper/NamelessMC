@@ -145,6 +145,7 @@ $template->getEngine()->addVariables([
     'NO_BACKUPS' => $language->get('admin', 'no_backups'),
     'FILENAME' => $language->get('admin', 'filename'),
     'DATE_CREATED' => $language->get('admin', 'date_created'),
+    'ACTIONS' => $language->get('general', 'actions'),
     'FILE_SIZE' => $language->get('admin', 'file_size'),
     'DOWNLOAD' => $language->get('admin', 'download'),
     'INFO' => $language->get('general', 'info'),
