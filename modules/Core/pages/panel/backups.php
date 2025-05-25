@@ -33,9 +33,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'create') {
     if (Token::check($_GET['token'])) {
         $task = (new Backup())->fromNew(
             Module::getIdFromName('Core'),
-            $language->get('admin', 'create_backup'),
+            Backup::MANUAL_BACKUP,
             null,
-            date('U'), // TODO: schedule a date/time?
+            date('U'),
             null,
             null,
             false,
@@ -48,6 +48,30 @@ if (isset($_GET['action']) && $_GET['action'] == 'create') {
         Redirect::to(URL::build('/panel/core/backups'));
     } else {
         Session::flash('backup_error', $language->get('general', 'invalid_token'));
+    }
+}
+
+// Handle settings form submission
+if (Input::exists() && Input::get('action') == 'settings') {
+    if (Token::check()) {
+        $max_retention = (int) Input::get('max_backup_retention');
+        $daily_scheduling = Input::get('daily_backup_scheduling') === '1' ? '1' : '0';
+
+        Settings::set('backup_max_retention', (string) $max_retention);
+        Settings::set('backup_daily_scheduling', $daily_scheduling);
+
+        // If daily scheduling is enabled, schedule the next backup, otherwise unschedule it
+        if ($daily_scheduling === '1') {
+            Backup::scheduleNextDailyBackup();
+        } else {
+            Backup::unscheduleNextDailyBackup();
+        }
+
+        Session::flash('backup_success', $language->get('admin', 'backup_settings_updated'));
+        Redirect::to(URL::build('/panel/core/backups'));
+    } else {
+        Session::flash('backup_error', $language->get('general', 'invalid_token'));
+        Redirect::to(URL::build('/panel/core/backups'));
     }
 }
 
@@ -125,6 +149,16 @@ $template->getEngine()->addVariables([
     'DOWNLOAD' => $language->get('admin', 'download'),
     'INFO' => $language->get('general', 'info'),
     'EXISTING' => $language->get('admin', 'existing_backups'),
+    'BACKUP_SETTINGS' => $language->get('admin', 'backup_settings'),
+    'MAX_BACKUP_RETENTION' => $language->get('admin', 'max_backup_retention'),
+    'MAX_BACKUP_RETENTION_INFO' => $language->get('admin', 'max_backup_retention_info'),
+    'MAX_BACKUP_RETENTION_VALUE' => Settings::get('backup_max_retention', '5'),
+    'DAILY_BACKUP_SCHEDULING' => $language->get('admin', 'daily_backup_scheduling'),
+    'DAILY_BACKUP_SCHEDULING_INFO' => $language->get('admin', 'daily_backup_scheduling_info'),
+    'DAILY_BACKUP_SCHEDULING_VALUE' => Settings::get('backup_daily_scheduling', '0'),
+    'ENABLED' => $language->get('admin', 'enabled'),
+    'DISABLED' => $language->get('admin', 'disabled'),
+    'SUBMIT' => $language->get('general', 'submit'),
 ]);
 
 $template->onPageLoad();

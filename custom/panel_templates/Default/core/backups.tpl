@@ -57,6 +57,37 @@
 
                             <br />
 
+                            <!-- Backup Settings -->
+                            <div class="card shadow border-left-info mb-4">
+                                <div class="card-body">
+                                    <h5><i class="icon fa fa-cogs"></i> {$BACKUP_SETTINGS}</h5>
+
+                                    <form action="" method="post">
+                                        <div class="form-group row">
+                                            <div class="col-md-6">
+                                                <label for="inputMaxRetention">{$MAX_BACKUP_RETENTION}</label>
+                                                <input type="number" name="max_backup_retention" id="inputMaxRetention"
+                                                       class="form-control" value="{$MAX_BACKUP_RETENTION_VALUE}" min="0" step="1">
+                                                <small class="form-text text-muted">{$MAX_BACKUP_RETENTION_INFO}</small>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="inputDailyScheduling">{$DAILY_BACKUP_SCHEDULING}</label>
+                                                <select name="daily_backup_scheduling" id="inputDailyScheduling" class="form-control">
+                                                    <option value="0" {if $DAILY_BACKUP_SCHEDULING_VALUE eq '0'}selected{/if}>{$DISABLED}</option>
+                                                    <option value="1" {if $DAILY_BACKUP_SCHEDULING_VALUE eq '1'}selected{/if}>{$ENABLED}</option>
+                                                </select>
+                                                <small class="form-text text-muted">{$DAILY_BACKUP_SCHEDULING_INFO}</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <input type="hidden" name="token" value="{$TOKEN}">
+                                            <input type="hidden" name="action" value="settings">
+                                            <input type="submit" class="btn btn-primary" value="{$SUBMIT}">
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
                             <!-- Existing Backups -->
                             {if isset($EXISTING_BACKUPS) && count($EXISTING_BACKUPS) > 0}
                                 <h5>{$EXISTING}</h5>

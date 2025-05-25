@@ -4,6 +4,9 @@ use Druidfi\Mysqldump\Mysqldump;
 
 class Backup extends Task
 {
+    public const DAILY_BACKUP = 'Daily Backup';
+    public const MANUAL_BACKUP = 'Manual Backup';
+
     private const EXCLUDED_DIRS = [
         'backups',
         '.git'
@@ -40,6 +43,19 @@ class Backup extends Task
 
         if (!$this->backupFiles($tempBackupFolder)) {
             return Task::STATUS_ERROR;
+        }
+
+        $maxRetention = (int) Settings::get('backup_max_retention', '5');
+        if ($maxRetention > 0) {
+            $this->cleanupOldBackups($backupsFolder, $maxRetention);
+        }
+
+        if ($this->getName() === self::DAILY_BACKUP && Settings::get('backup_daily_scheduling', '0')) {
+            self::scheduleNextDailyBackup();
+
+            $this->setOutput([
+                'schedule' => 'Next daily backup scheduled successfully',
+            ]);
         }
 
         return Task::STATUS_COMPLETED;
@@ -193,5 +209,70 @@ class Backup extends Task
         }
 
         return rmdir($folder);
+    }
+
+    /**
+     * Clean up old backups based on the max retention setting
+     */
+    private function cleanupOldBackups($backupsFolder, $maxRetention): void
+    {
+        $backupFiles = glob($backupsFolder . 'nameless_backup_*.zip');
+
+        if (count($backupFiles) <= $maxRetention) {
+            return;
+        }
+
+        usort($backupFiles, function($a, $b) {
+            return filemtime($b) - filemtime($a);
+        });
+
+        $filesToDelete = array_slice($backupFiles, $maxRetention);
+        foreach ($filesToDelete as $file) {
+            unlink($file);
+        }
+
+        $this->setOutput([
+            'cleanup' => count($filesToDelete) . ' backups cleaned up successfully',
+        ]);
+    }
+
+    /**
+     * Schedule the next daily backup if daily scheduling is enabled
+     */
+    public static function scheduleNextDailyBackup(): void
+    {
+        // Cancel any existing scheduled daily backups to avoid duplicates
+        $existingTasks = DB::getInstance()->query(
+            'SELECT id FROM nl2_queue WHERE `task` = ? AND `name` = ? AND `status` = ?',
+            [Backup::class, self::DAILY_BACKUP, 'ready']
+        )->results();
+
+        foreach ($existingTasks as $task) {
+            DB::getInstance()->delete('queue', ['id', $task->id]);
+        }
+
+        // Schedule new daily backup for tomorrow
+        $task = (new Backup())->fromNew(
+            Module::getIdFromName('Core'),
+            self::DAILY_BACKUP,
+            null,
+            Date::next()->getTimestamp(),
+        );
+        Queue::schedule($task);
+    }
+
+    /**
+     * Unschedule the next daily backup
+     */
+    public static function unscheduleNextDailyBackup(): void
+    {
+        $existingTasks = DB::getInstance()->query(
+            'SELECT id FROM nl2_queue WHERE `task` = ? AND `name` = ? AND `status` = ?',
+            [Backup::class, self::DAILY_BACKUP, 'ready']
+        )->results();
+
+        foreach ($existingTasks as $task) {
+            DB::getInstance()->delete('queue', ['id', $task->id]);
+        }
     }
 }
