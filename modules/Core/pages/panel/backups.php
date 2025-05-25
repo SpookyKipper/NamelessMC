@@ -54,14 +54,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'create') {
 // Handle settings form submission
 if (Input::exists() && Input::get('action') == 'settings') {
     if (Token::check()) {
-        $max_retention = (int) Input::get('max_backup_retention');
+        $max_retention = Input::get('max_backup_retention');
         $daily_scheduling = Input::get('daily_backup_scheduling') === '1' ? '1' : '0';
 
-        Settings::set('backup_max_retention', (string) $max_retention);
+        Settings::set('backup_max_retention', $max_retention);
         Settings::set('backup_daily_scheduling', $daily_scheduling);
 
         // If daily scheduling is enabled, schedule the next backup, otherwise unschedule it
-        if ($daily_scheduling === '1') {
+        if ($daily_scheduling) {
             Backup::scheduleNextDailyBackup();
         } else {
             Backup::unscheduleNextDailyBackup();
