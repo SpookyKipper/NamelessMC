@@ -44,7 +44,7 @@ return new class() extends UpgradeScript {
         if (!isset($permissions['admincp.core.backups'])) {
             $permissions['admincp.core.backups'] = 1;
             DB::getInstance()->update('groups', $admin_group->id, [
-                'permissions' => json_encode($permissions)
+                'permissions' => json_encode($permissions),
             ]);
         }
 
