@@ -28,7 +28,7 @@ class Backup extends Task
             return Task::STATUS_ERROR;
         }
 
-        if (!$this->ensureHasDiskSpace()) {
+        if (!$this->hasDiskSpace()) {
             return Task::STATUS_ERROR;
         }
 
@@ -42,6 +42,10 @@ class Backup extends Task
         }
 
         if (!$this->backupFiles($tempBackupFolder)) {
+            return Task::STATUS_ERROR;
+        }
+
+        if (!$this->createZipArchive($backupsFolder, $tempBackupFolder)) {
             return Task::STATUS_ERROR;
         }
 
@@ -73,7 +77,7 @@ class Backup extends Task
         return true;
     }
 
-    private function ensureHasDiskSpace(): bool
+    private function hasDiskSpace(): bool
     {
         $dbConfig = Config::get('mysql');
         $dbName = $dbConfig['db'];
@@ -161,9 +165,14 @@ class Backup extends Task
             }
         }
 
-        // Create a zip archive of the backup folder
+        return true;
+    }
+
+    private function createZipArchive(string $backupsFolder, string $tempBackupFolder): bool
+    {
+        $zipFileLocation = $backupsFolder . '/nameless_backup_' . date('Y-m-d_H-i-s') . '.zip';
+
         $zip = new ZipArchive();
-        $zipFileLocation = ROOT_PATH . '/backups/nameless_backup_' . date('Y-m-d_H-i-s') . '.zip';
         if ($zip->open($zipFileLocation, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             $this->setOutput([
                 'error' => 'Failed to create zip archive',
@@ -237,14 +246,13 @@ class Backup extends Task
     }
 
     /**
-     * Schedule the next daily backup if daily scheduling is enabled
+     * Schedule the next daily backup
      */
     public static function scheduleNextDailyBackup(): void
     {
         // Cancel any existing scheduled daily backups to avoid duplicates
         self::unscheduleNextDailyBackup();
 
-        // Schedule new daily backup for tomorrow
         $task = (new Backup())->fromNew(
             Module::getIdFromName('Core'),
             self::DAILY_BACKUP,
@@ -259,13 +267,10 @@ class Backup extends Task
      */
     public static function unscheduleNextDailyBackup(): void
     {
-        $existingTasks = DB::getInstance()->query(
-            'SELECT id FROM nl2_queue WHERE `task` = ? AND `name` = ? AND `status` = ?',
-            [Backup::class, self::DAILY_BACKUP, 'ready']
-        )->results();
-
-        foreach ($existingTasks as $task) {
-            DB::getInstance()->delete('queue', ['id', $task->id]);
-        }
+        DB::getInstance()->delete('queue', [
+            ['task', Backup::class],
+            ['name', self::DAILY_BACKUP],
+            ['status', Task::STATUS_READY]
+        ]);
     }
 }
