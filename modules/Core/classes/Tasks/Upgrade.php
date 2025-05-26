@@ -31,10 +31,12 @@ class Upgrade extends Task
 
         $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
         if (!$upgradeZipPath) {
+            $this->releaseLock();
             return Task::STATUS_FAILED;
         }
 
         if (!$this->extractUpgradePackage($upgradeZipPath)) {
+            $this->releaseLock();
             return Task::STATUS_FAILED;
         }
 
