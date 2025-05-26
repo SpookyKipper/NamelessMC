@@ -1,15 +1,11 @@
 <?php
 
-use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\PhpExecutableFinder;
+use Symfony\Component\Process\Process;
 
 /**
  * Download and execute update task for NamelessMC
- *
- * This simplified task:
- * 1. Validates update availability
- * 2. Downloads the upgrade package
- * 3. Executes the isolated CLI upgrade script synchronously
  *
  * @package NamelessMC\Tasks
  * @author Aberdeener
@@ -19,53 +15,78 @@ use Symfony\Component\Process\PhpExecutableFinder;
 class Upgrade extends Task
 {
     private const DOWNLOAD_TIMEOUT = 30;
-    private const UPGRADE_SCRIPT_PATH = '/upgrade_cli.php';
-
-    private Cache $cache;
-    private string $tmpDir;
 
     public function run(): string
     {
-        try {
-            $updateCheck = $this->validateUpdateAvailable();
-            if (!$updateCheck) {
-                return Task::STATUS_FAILED;
-            }
-
-            $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
-            if (!$upgradeZipPath) {
-                return Task::STATUS_FAILED;
-            }
-
-            $success = $this->executeUpgrade($updateCheck, $upgradeZipPath);
-            return $success ? Task::STATUS_COMPLETED : Task::STATUS_FAILED;
-
-        } catch (Exception $e) {
-            $this->setOutput([
-                'error' => "Upgrade failed: {$e->getMessage()}",
-                'exception' => $e->getMessage(),
-                'failed_at' => date('Y-m-d H:i:s')
-            ]);
-
+        // Acquire lock to prevent concurrent upgrades
+        if (!$this->acquireLock()) {
             return Task::STATUS_FAILED;
+        }
+
+        $updateCheck = $this->validateUpdateAvailable();
+        if (!$updateCheck) {
+            $this->releaseLock();
+            return Task::STATUS_FAILED;
+        }
+
+        $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
+        if (!$upgradeZipPath) {
+            return Task::STATUS_FAILED;
+        }
+
+        if (!$this->extractUpgradePackage($upgradeZipPath)) {
+            return Task::STATUS_FAILED;
+        }
+
+        if (!$this->executeMigrations()) {
+            $this->releaseLock();
+            return Task::STATUS_FAILED;
+        }
+
+        $this->releaseLock();
+
+        return Task::STATUS_COMPLETED;
+    }
+
+    private function acquireLock(): bool
+    {
+        $lockFile = ROOT_PATH . '/cache/upgrade.lock';
+        if (file_exists($lockFile)) {
+            $this->setOutput(['error' => 'Upgrade is already running']);
+            return false;
+        }
+
+        if (!file_put_contents($lockFile, 'locked')) {
+            $this->setOutput(['error' => 'Failed to create lock file']);
+            return false;
+        }
+
+        return true;
+    }
+
+    private function releaseLock(): void
+    {
+        $lockFile = ROOT_PATH . '/cache/upgrade.lock';
+        if (file_exists($lockFile)) {
+            unlink($lockFile);
         }
     }
 
     /**
-     * Initialize cache and validate that an update is available
+     * Validate that an update is available
      *
      * @return UpdateCheck|null Returns UpdateCheck object if update available, null otherwise
      */
     private function validateUpdateAvailable(): ?UpdateCheck
     {
-        $this->cache = new Cache([
+        $cache = new Cache([
             'name' => 'nameless',
             'extension' => '.cache',
             'path' => ROOT_PATH . '/cache/'
         ]);
 
-        $this->cache->setCache('update_check');
-        $updateCheck = $this->cache->retrieve('update_check');
+        $cache->setCache('update_check');
+        $updateCheck = $cache->retrieve('update_check');
 
         if (!$updateCheck) {
             $this->setOutput(['update_check' => 'No update available']);
@@ -84,8 +105,7 @@ class Upgrade extends Task
      */
     private function downloadUpgradePackage(UpdateCheck $updateCheck): ?string
     {
-        $this->tmpDir = $this->getTempDirectory();
-        $upgradeZipPath = $this->tmpDir . DIRECTORY_SEPARATOR . "namelessmc-upgrade-{$updateCheck->versionTag()}.zip";
+        $upgradeZipPath = $this->getTempDirectory() . DIRECTORY_SEPARATOR . "namelessmc-upgrade-{$updateCheck->versionTag()}.zip";
 
         $downloadResponse = HttpClient::get($updateCheck->upgradeZipLink(), [
             'sink' => $upgradeZipPath,
@@ -103,7 +123,6 @@ class Upgrade extends Task
             'zip_download' => "Downloaded upgrade zip to: {$upgradeZipPath}"
         ]);
 
-        // Verify checksum of downloaded file
         if (!$this->verifyChecksum($upgradeZipPath, $updateCheck)) {
             return null;
         }
@@ -111,97 +130,28 @@ class Upgrade extends Task
         return $upgradeZipPath;
     }
 
-    /**
-     * Execute the upgrade using the isolated CLI script with full output capture
-     *
-     * @param UpdateCheck $updateCheck The update information
-     * @param string $upgradeZipPath Path to the downloaded upgrade package
-     * @return bool True on success, false on failure
-     */
-    private function executeUpgrade(UpdateCheck $updateCheck, string $upgradeZipPath): bool
+    public function extractUpgradePackage(string $upgradeZipPath): bool
     {
-        $this->setOutput(['upgrade' => 'Starting upgrade process...']);
-
-        try {
-            $upgradeDataPath = $this->createUpgradeDataFile($updateCheck, $upgradeZipPath);
-
-            // Find PHP executable
-            $phpFinder = new PhpExecutableFinder();
-            $phpBinary = $phpFinder->find();
-            if (!$phpBinary) {
-                $this->setOutput(['error' => 'PHP executable not found']);
-                return false;
-            }
-
-            // Execute CLI script synchronously
-            $upgradeScript = ROOT_PATH . self::UPGRADE_SCRIPT_PATH;
-            if (!is_file($upgradeScript)) {
-                $this->setOutput(['error' => "Upgrade script not found: {$upgradeScript}"]);
-                return false;
-            }
-
-            $process = new Process([$phpBinary, $upgradeScript, $upgradeDataPath]);
-            $process->setWorkingDirectory(ROOT_PATH);
-            $process->setTimeout(300); // 5 minutes
-
-            // Run the process and capture all output
-            $process->run();
-
-            // Capture both stdout and stderr
-            $output = $process->getOutput();
-            $errorOutput = $process->getErrorOutput();
-            $combinedOutput = trim($output . ($errorOutput ? "\n--- ERRORS ---\n" . $errorOutput : ''));
-
-            // Store the complete output regardless of success/failure
-            $outputData = [
-                'upgrade_log' => $combinedOutput,
-                'exit_code' => $process->getExitCode(),
-                'started_at' => date('Y-m-d H:i:s'),
-                'version_target' => $updateCheck->versionTag()
-            ];
-
-            if ($process->isSuccessful()) {
-                $outputData['upgrade'] = 'Upgrade completed successfully';
-                $outputData['result'] = "Upgrade completed successfully to version {$updateCheck->versionTag()}.";
-                $this->setOutput($outputData);
-                return true;
-            } else {
-                $outputData['error'] = 'Upgrade process failed with exit code: ' . $process->getExitCode();
-                $this->setOutput($outputData);
-                return false;
-            }
-
-        } catch (Exception $e) {
+        $zip = new ZipArchive();
+        if ($zip->open($upgradeZipPath) !== true) {
             $this->setOutput([
-                'error' => "Upgrade failed: {$e->getMessage()}",
-                'exception' => $e->getMessage(),
-                'started_at' => date('Y-m-d H:i:s'),
-                'version_target' => $updateCheck->versionTag()
+                'zip_extract' => "Failed to open upgrade zip: {$upgradeZipPath}"
             ]);
             return false;
         }
-    }
 
-    /**
-     * Create a JSON data file with upgrade parameters for the CLI script
-     *
-     * @param UpdateCheck $updateCheck The update information
-     * @param string $upgradeZipPath Path to the downloaded upgrade package
-     * @return string Path to the created data file
-     * @throws Exception If file creation fails
-     */
-    private function createUpgradeDataFile(UpdateCheck $updateCheck, string $upgradeZipPath): string
-    {
-        $upgradeData = [
-            'zip_path' => $upgradeZipPath,
-            'version_tag' => $updateCheck->versionTag(),
-            'root_path' => ROOT_PATH
-        ];
+        // Extract to the root directory of the NamelessMC installation
+        if (!$zip->extractTo(ROOT_PATH)) {
+            $this->setOutput([
+                'zip_extract' => "Failed to extract upgrade zip: {$upgradeZipPath}"
+            ]);
+            return false;
+        }
 
-        $upgradeDataPath = $this->tmpDir . DIRECTORY_SEPARATOR . 'namelessmc_upgrade_data.json';
-        file_put_contents($upgradeDataPath, json_encode($upgradeData, JSON_PRETTY_PRINT));
+        $zip->close();
+        $this->setOutput(['zip_extract' => 'Upgrade package extracted successfully']);
 
-        return $upgradeDataPath;
+        return true;
     }
 
     /**
@@ -215,15 +165,13 @@ class Upgrade extends Task
     {
         $expectedChecksum = $updateCheck->checksum();
 
-        // Skip verification if no checksum is provided
+        // Skip verification if no checksum is provided, this should never happen in practice
         if (empty($expectedChecksum)) {
             $this->setOutput([
                 'checksum_verify' => 'No checksum provided for verification, skipping checksum check'
             ]);
             return true;
         }
-
-        $this->setOutput(['checksum_verify' => 'Verifying download integrity...']);
 
         $actualChecksum = hash_file('sha256', $upgradeZipPath);
         if ($actualChecksum === false) {
@@ -245,12 +193,38 @@ class Upgrade extends Task
         ]);
 
         // Remove the corrupted file
-        if (file_exists($upgradeZipPath)) {
-            unlink($upgradeZipPath);
-            $this->setOutput(['checksum_verify' => 'Removed corrupted download file']);
-        }
+        unlink($upgradeZipPath);
+        $this->setOutput(['checksum_verify' => 'Removed corrupted download file']);
 
         return false;
+    }
+
+    private function executeMigrations(): bool
+    {
+        $process = new Process([
+            (new PhpExecutableFinder())->find(),
+            'vendor/bin/phinx',
+            'migrate',
+            '-c',
+            'core/migrations/phinx.php',
+        ]);
+
+        $process->setWorkingDirectory(ROOT_PATH);
+
+        try {
+            $process->mustRun();
+        } catch (ProcessFailedException $e) {
+            $this->setOutput([
+                'migrations' => "Migrations failed: {$e->getMessage()}"
+            ]);
+            return false;
+        }
+
+        $this->setOutput([
+            'migrations' => $process->getOutput(),
+        ]);
+
+        return $process->isSuccessful();
     }
 
     /**
