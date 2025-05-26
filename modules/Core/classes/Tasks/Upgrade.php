@@ -204,7 +204,7 @@ class Upgrade extends Task
     private function executeMigrations(): bool
     {
         $process = new Process([
-            (new PhpExecutableFinder())->find(),
+            (new PhpExecutableFinder())->find(), // returns '' locally, could be a laravel valet quirk? works if i hardcode full homebrew path
             'vendor/bin/phinx',
             'migrate',
             '-c',
