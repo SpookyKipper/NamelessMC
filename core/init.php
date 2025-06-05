@@ -244,38 +244,7 @@ if ($page != 'install') {
     define('SITE_NAME', $sitename);
 
     // Template
-    if (!$user->isLoggedIn() || !$user->data()->theme_id) {
-        // Default template for guests
-        define('TEMPLATE', Settings::get('default_template', 'DefaultRevamp'));
-    } else {
-        // User selected template
-        $template = DB::getInstance()->get('templates', ['id', $user->data()->theme_id])->results();
-        if (!count($template)) {
-            // Get default template
-            define('TEMPLATE', Settings::get('default_template', 'DefaultRevamp'));
-        } else {
-            // Check permissions
-            $template = $template[0];
-            $hasPermission = false;
-
-            if ($template->enabled) {
-                $user_templates = $user->getUserTemplates();
-
-                foreach ($user_templates as $user_template) {
-                    if ($user_template->id === $template->id) {
-                        $hasPermission = true;
-                        define('TEMPLATE', $template->name);
-                        break;
-                    }
-                }
-            }
-
-            if (!$hasPermission) {
-                // Get default template
-                define('TEMPLATE', Settings::get('default_template', 'DefaultRevamp'));
-            }
-        }
-    }
+    define('TEMPLATE', Settings::get('default_template', 'DefaultRevamp'));
 
     // Panel template
     define('PANEL_TEMPLATE', Settings::get('default_panel_template', 'Default'));

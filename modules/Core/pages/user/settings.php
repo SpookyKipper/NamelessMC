@@ -248,33 +248,6 @@ if (isset($_GET['do'])) {
                         $new_language = $user->data()->language_id;
                     }
 
-                    // Template
-                    if (Input::get('template') != 0) {
-                        $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
-
-                        if (count($new_template)) {
-                            $new_template = $new_template[0]->id;
-                        } else {
-                            $new_template = $user_query->theme_id;
-                        }
-                    } else {
-                        $new_template = null;
-                    }
-
-                    // Check permissions
-                    $available_templates = $user->getUserTemplates();
-
-                    foreach ($available_templates as $available_template) {
-                        if ($available_template->id == $new_template) {
-                            $can_update = true;
-                            break;
-                        }
-                    }
-
-                    if (!isset($can_update)) {
-                        $new_template = $user->data()->theme_id;
-                    }
-
                     $timezone = Input::get('timezone');
 
                     if ($user->hasPermission('usercp.signature')) {
@@ -306,7 +279,6 @@ if (isset($_GET['do'])) {
                         'nickname' => $displayname,
                         'user_title' => $user_title,
                         'private_profile' => $privateProfile,
-                        'theme_id' => $new_template,
                         'gravatar' => $gravatar,
                     ];
 
@@ -495,23 +467,6 @@ if (isset($_GET['do'])) {
         ];
     }
 
-    // Get templates
-    $templates = [];
-    $templates_query = $user->getUserTemplates();
-
-    $templates[] = [
-        'id' => 0,
-        'name' => $language->get('general', 'default'),
-        'active' => $user->data()->theme_id === null
-    ];
-    foreach ($templates_query as $item) {
-        $templates[] = [
-            'id' => Output::getClean($item->id),
-            'active' => $item->id === $user->data()->theme_id,
-            'name' => Output::getClean($item->name)
-        ];
-    }
-
     // Get custom fields
     $custom_fields_template = [];
     if ($user->hasPermission('usercp.nickname')) {
@@ -609,7 +564,6 @@ if (isset($_GET['do'])) {
         'ACTIVE_LANGUAGE' => $language->get('user', 'active_language'),
         'LANGUAGES' => $languages,
         'ACTIVE_TEMPLATE' => $language->get('user', 'active_template'),
-        'TEMPLATES' => $templates,
         'PROFILE_FIELDS' => $custom_fields_template,
         'SUBMIT' => $language->get('general', 'submit'),
         'TOKEN' => Token::get(),

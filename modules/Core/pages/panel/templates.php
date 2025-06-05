@@ -342,8 +342,6 @@ if (!isset($_GET['action'])) {
                         ]),
                         'BACK' => $language->get('general', 'back'),
                         'BACK_LINK' => URL::build('/panel/core/templates'),
-                        'PERMISSIONS' => $language->get('admin', 'permissions'),
-                        'PERMISSIONS_LINK' => $user->hasPermission('admincp.groups') ? URL::build('/panel/core/templates/', 'template=' . urlencode($template_query->id) . '&action=permissions') : null,
                     ]);
 
                     $template_file = 'core/template_settings';
@@ -356,120 +354,6 @@ if (!isset($_GET['action'])) {
 
             /** @var TemplateBase $template */
             $template = $current_template;
-
-            break;
-
-        case 'permissions':
-            // Template permissions
-            if (!$user->hasPermission('admincp.groups')) {
-                Redirect::to(URL::build('/panel/core/templates'));
-            }
-
-            // Get the template
-            $template_query = DB::getInstance()->get('templates', ['id', $_GET['template']])->results();
-            if (count($template_query)) {
-                $template_query = $template_query[0];
-            } else {
-                Redirect::to(URL::build('/panel/core/templates'));
-            }
-
-            // Handle input
-            if (Input::exists()) {
-                if (Token::check()) {
-                    // Guest template permissions
-                    $can_use_template = Input::get('perm-use-0');
-
-                    if (!($can_use_template)) {
-                        $can_use_template = 0;
-                    }
-
-                    $perm_exists = 0;
-
-                    $perm_query = DB::getInstance()->get('groups_templates', ['template_id', $template_query->id])->results();
-                    if (count($perm_query)) {
-                        foreach ($perm_query as $query) {
-                            if ($query->group_id == 0) {
-                                $perm_exists = 1;
-                                $update_id = $query->id;
-                                break;
-                            }
-                        }
-                    }
-
-                    if ($perm_exists != 0) { // Permission already exists, update
-                        // Update the permission
-                        DB::getInstance()->update('groups_templates', $update_id, [
-                            'can_use_template' => $can_use_template
-                        ]);
-                    } else { // Permission doesn't exist, create
-                        DB::getInstance()->insert('groups_templates', [
-                            'group_id' => 0,
-                            'template_id' => $template_query->id,
-                            'can_use_template' => $can_use_template,
-                        ]);
-                    }
-
-                    // Group template permissions
-                    foreach (Group::all() as $group) {
-                        $can_use_template = Input::get('perm-use-' . $group->id);
-
-                        if (!($can_use_template)) {
-                            $can_use_template = 0;
-                        }
-
-                        $perm_exists = 0;
-
-                        if (count($perm_query)) {
-                            foreach ($perm_query as $query) {
-                                if ($query->group_id == $group->id) {
-                                    $perm_exists = 1;
-                                    $update_id = $query->id;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if ($perm_exists != 0) { // Permission already exists, update
-                            // Update the permission
-                            DB::getInstance()->update('groups_templates', $update_id, [
-                                'can_use_template' => $can_use_template,
-                            ]);
-                        } else { // Permission doesn't exist, create
-                            DB::getInstance()->insert('groups_templates', [
-                                'group_id' => $group->id,
-                                'template_id' => $template_query->id,
-                                'can_use_template' => $can_use_template,
-                            ]);
-                        }
-                    }
-
-                    $success = $language->get('admin', 'successfully_updated');
-                } else {
-                    $errors = [$language->get('general', 'invalid_token')];
-                }
-            }
-
-            // Get permissions
-            $guest_query = DB::getInstance()->query('SELECT 0 AS id, can_use_template FROM nl2_groups_templates WHERE group_id = 0 AND template_id = ?', [$template_query->id])->results();
-            $group_query = DB::getInstance()->query('SELECT id, `name`, can_use_template FROM nl2_groups A LEFT JOIN (SELECT group_id, can_use_template FROM nl2_groups_templates WHERE template_id = ?) B ON A.id = B.group_id ORDER BY `order` ASC', [$template_query->id])->results();
-
-            $template->getEngine()->addVariables([
-                'EDITING_TEMPLATE' => $language->get('admin', 'editing_template_x', [
-                    'template' => Text::bold(Output::getClean($template_query->name))
-                ]),
-                'BACK' => $language->get('general', 'back'),
-                'BACK_LINK' => URL::build('/panel/core/templates'),
-                'PERMISSIONS' => $language->get('admin', 'permissions'),
-                'GUESTS' => $language->get('user', 'guests'),
-                'GUEST_PERMISSIONS' => (count($guest_query) ? $guest_query[0] : []),
-                'GROUP_PERMISSIONS' => $group_query,
-                'GROUP' => $language->get('admin', 'group'),
-                'CAN_USE_TEMPLATE' => $language->get('admin', 'can_use_template'),
-                'SELECT_ALL' => $language->get('admin', 'select_all'),
-                'DESELECT_ALL' => $language->get('admin', 'deselect_all'),
-            ]);
-
-            $template_file = 'core/template_permissions';
 
             break;
 
@@ -522,8 +406,6 @@ if (!isset($_GET['action'])) {
                     'TEMPLATE_DIRS' => $template_dirs,
                     'VIEW' => $language->get('general', 'view'),
                     'EDIT' => $language->get('general', 'edit'),
-                    'PERMISSIONS' => $language->get('admin', 'permissions'),
-                    'PERMISSIONS_LINK' => $user->hasPermission('admincp.groups') ? URL::build('/panel/core/templates/', 'template=' . urlencode($template_query->id) . '&action=permissions') : null,
                 ]);
 
                 $template_file = 'core/templates_list_files';
@@ -576,8 +458,6 @@ if (!isset($_GET['action'])) {
                         'TEMPLATE_DIRS' => $template_dirs,
                         'VIEW' => $language->get('general', 'view'),
                         'EDIT' => $language->get('general', 'edit'),
-                        'PERMISSIONS' => $language->get('admin', 'permissions'),
-                        'PERMISSIONS_LINK' => $user->hasPermission('admincp.groups') ? '/panel/core/templates/?template=' . Output::getClean($template_query->id) . '&action=permissions' : null,
                     ]);
 
                     $template_file = 'core/templates_list_files';

@@ -164,19 +164,6 @@ if (Input::exists()) {
                     $private_profile = Input::get('privateProfile');
                 }
 
-                // Template
-                if (Input::get('template') != 0) {
-                    $new_template = DB::getInstance()->get('templates', ['id', Input::get('template')])->results();
-
-                    if (count($new_template)) {
-                        $new_template = $new_template[0]->id;
-                    } else {
-                        $new_template = $user_query->theme_id;
-                    }
-                } else {
-                    $new_template = null;
-                }
-
                 // Nicknames?
                 $username = Input::get('username');
                 if (Settings::get('displaynames') === '1') {
@@ -194,7 +181,6 @@ if (Input::exists()) {
                     'private_profile' => $private_profile,
                     'language_id' => Output::getClean(Input::get('language')),
                     'timezone' => Output::getClean(Input::get('timezone')),
-                    'theme_id' => $new_template
                 ]);
 
                 $group_sync_log = [];
@@ -345,22 +331,6 @@ if ($user_query->id == 1 || ($user_query->id == $user->data()->id && !$user->has
 
 $private_profile = Settings::get('private_profile');
 
-$templates = [];
-$templates_query = DB::getInstance()->get('templates', ['enabled', 1])->results();
-
-$templates[] = [
-    'id' => 0,
-    'name' => $language->get('general', 'default'),
-    'active' => $user_query->theme_id === null
-];
-foreach ($templates_query as $item) {
-    $templates[] = [
-        'id' => Output::getClean($item->id),
-        'name' => Output::getClean($item->name),
-        'active' => $item->id === $user_query->theme_id
-    ];
-}
-
 $groups = DB::getInstance()->orderAll('groups', '`order`', 'ASC')->results();
 $filtered_groups = [];
 foreach ($groups as $group) {
@@ -436,7 +406,6 @@ $template->getEngine()->addVariables([
     'INFO' => $language->get('general', 'info'),
     'ACTIVE_TEMPLATE' => $language->get('user', 'active_template'),
     'NO_ITEM_SELECTED' => $language->get('admin', 'no_item_selected'),
-    'TEMPLATES' => $templates,
 ]);
 
 $template->assets()->include([

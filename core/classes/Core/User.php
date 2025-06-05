@@ -1119,22 +1119,6 @@ class User
     }
 
     /**
-     * Get templates this user's group has access to.
-     *
-     * @return array Templates which the user has access to.
-     */
-    public function getUserTemplates(): array
-    {
-        $groups = '(';
-        foreach ($this->getGroups() as $group) {
-            $groups .= ((int) $group->id) . ',';
-        }
-        $groups = rtrim($groups, ',') . ')';
-
-        return $this->_db->query("SELECT template.id, template.name FROM nl2_templates AS template WHERE template.enabled = 1 AND template.id IN (SELECT template_id FROM nl2_groups_templates WHERE can_use_template = 1 AND group_id IN $groups)")->results();
-    }
-
-    /**
      * Save/update this user's placeholders.
      *
      * @param int   $server_id    Server ID from staffcp -> integrations to assoc these placeholders with.
