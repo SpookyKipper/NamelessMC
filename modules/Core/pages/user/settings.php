@@ -261,20 +261,6 @@ if (isset($_GET['do'])) {
                         $new_template = null;
                     }
 
-                    // Check permissions
-                    $available_templates = $user->getUserTemplates();
-
-                    foreach ($available_templates as $available_template) {
-                        if ($available_template->id == $new_template) {
-                            $can_update = true;
-                            break;
-                        }
-                    }
-
-                    if (!isset($can_update)) {
-                        $new_template = $user->data()->theme_id;
-                    }
-
                     $timezone = Input::get('timezone');
 
                     if ($user->hasPermission('usercp.signature')) {
@@ -497,7 +483,7 @@ if (isset($_GET['do'])) {
 
     // Get templates
     $templates = [];
-    $templates_query = $user->getUserTemplates();
+    $templates_query = DB::getInstance()->get('templates', ['id', '<>', 0])->results();
 
     $templates[] = [
         'id' => 0,
