@@ -115,6 +115,8 @@ $template->getEngine()->addVariables([
     'USER_TITLE_LABEL' => $language->get('admin', 'title'),
     'LANGUAGE_LABEL' => $language->get('user', 'active_language'),
     'TIMEZONE_LABEL' => $language->get('user', 'timezone'),
+    'TEMPLATE_LABEL' => $language->get('admin', 'template'),
+    'TEMPLATE' => DB::getInstance()->get('templates', ['id', $user_query->theme_id])->first()->name ?? TEMPLATE,
     'NAME' => $language->get('admin', 'name'),
     'CONTENT' => $language->get('admin', 'content'),
     'UPDATED' => $language->get('admin', 'updated'),

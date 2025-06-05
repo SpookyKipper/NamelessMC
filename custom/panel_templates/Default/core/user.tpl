@@ -123,6 +123,12 @@
                                             </div>
                                         </div>
                                         {/if}
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="template">{$TEMPLATE_LABEL}</label>
+                                                <input id="template" type="text" class="form-control" value="{$TEMPLATE}" readonly>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
