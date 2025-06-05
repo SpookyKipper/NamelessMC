@@ -102,17 +102,6 @@
                             {/foreach}
                         </select>
                     </div>
-                    {if count($TEMPLATES) > 2}
-                    <div class="field">
-                        <label for="inputTemplate">{$ACTIVE_TEMPLATE}</label>
-                        <select class="ui fluid dropdown" name="template" id="inputTemplate">
-                            {foreach from=$TEMPLATES item=template}
-                            <option value="{$template.id}" {if $template.active==true} selected{/if}>{$template.name}
-                            </option>
-                            {/foreach}
-                        </select>
-                    </div>
-                    {/if}
                     <div class="field">
                         <label for="inputTimezone">{$TIMEZONE}</label>
                         <select class="ui fluid dropdown" name="timezone" id="inputTimezone">

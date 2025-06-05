@@ -563,7 +563,6 @@ if (isset($_GET['do'])) {
         'SETTINGS' => $language->get('user', 'profile_settings'),
         'ACTIVE_LANGUAGE' => $language->get('user', 'active_language'),
         'LANGUAGES' => $languages,
-        'ACTIVE_TEMPLATE' => $language->get('user', 'active_template'),
         'PROFILE_FIELDS' => $custom_fields_template,
         'SUBMIT' => $language->get('general', 'submit'),
         'TOKEN' => Token::get(),

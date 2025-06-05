@@ -1147,7 +1147,6 @@
     "user/account_banned": "That account is banned.",
     "user/acknowledge": "Acknowledge",
     "user/active_language": "Active Language",
-    "user/active_template": "Active Template",
     "user/agree_t_and_c": "I have read and accept the {{linkStart}}Terms and Conditions{{linkEnd}}.",
     "user/alerts": "Alerts",
     "user/alerts_follow_link": "Follow alert link",

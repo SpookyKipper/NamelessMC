@@ -404,7 +404,6 @@ $template->getEngine()->addVariables([
     'MAIN_GROUP' => $view_user->getMainGroup(),
     'MAIN_GROUP_INFO' => $language->get('admin', 'main_group'),
     'INFO' => $language->get('general', 'info'),
-    'ACTIVE_TEMPLATE' => $language->get('user', 'active_template'),
     'NO_ITEM_SELECTED' => $language->get('admin', 'no_item_selected'),
 ]);
 
