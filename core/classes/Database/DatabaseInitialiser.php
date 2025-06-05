@@ -279,18 +279,16 @@ class DatabaseInitialiser
         $this->_db->insert('templates', [
             'name' => 'DefaultRevamp',
             'enabled' => true,
-            'is_default' => true,
         ]);
 
-        $this->_cache->setCache('templatecache');
-        $this->_cache->store('default', 'DefaultRevamp');
+        Settings::set('default_template', 'DefaultRevamp');
 
         $this->_db->insert('panel_templates', [
             'name' => 'Default',
             'enabled' => true,
-            'is_default' => true,
         ]);
-        $this->_cache->store('panel_default', 'Default');
+
+        Settings::set('default_panel_template', 'Default');
 
         $config_path = Config::get('core.path');
         if (!empty($config_path)) {
