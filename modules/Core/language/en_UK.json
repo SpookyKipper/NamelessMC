@@ -468,6 +468,7 @@
     "admin/outgoing_email": "Outgoing Email Address",
     "admin/outgoing_email_info": "This is the email address which NamelessMC will use to send emails from.",
     "admin/overview": "Overview",
+    "admin/only_root_user_can_download_backups": "Only the root user can download backups.",
     "admin/page": "Page",
     "admin/page_content": "Page Content",
     "admin/page_content_maximum_100000": "The page content must be a maximum of 100000 characters.",

@@ -99,7 +99,9 @@
                                                 <th>{$FILENAME}</th>
                                                 <th>{$DATE_CREATED}</th>
                                                 <th>{$FILE_SIZE}</th>
-                                                <th>{$ACTIONS}</th>
+                                                {if $CAN_DOWNLOAD}
+                                                    <th>{$ACTIONS}</th>
+                                                {/if}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -108,11 +110,13 @@
                                                     <td>{$backup.filename}</td>
                                                     <td>{$backup.date}</td>
                                                     <td>{$backup.size}</td>
+                                                    {if $CAN_DOWNLOAD}
                                                     <td>
                                                         <a href="{$backup.download_link}" target="_blank" class="btn btn-sm btn-primary">
                                                             <i class="fa fa-download"></i> {$DOWNLOAD}
                                                         </a>
                                                     </td>
+                                                    {/if}
                                                 </tr>
                                             {/foreach}
                                         </tbody>

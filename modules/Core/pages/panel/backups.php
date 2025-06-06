@@ -79,15 +79,21 @@ $backups_dir = ROOT_PATH . '/backups/';
 
 // Handle download request
 if (isset($_GET['download']) && !empty($_GET['download'])) {
-    $filename = basename($_GET['download']);
-    $filepath = $backups_dir . $filename;
+    // Only allow root user to download backups
+    if ($user->data()->id == 1) {
+        $filename = basename($_GET['download']);
+        $filepath = $backups_dir . $filename;
 
-    if (file_exists($filepath) && pathinfo($filepath, PATHINFO_EXTENSION) === 'zip') {
-        header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . filesize($filepath));
-        readfile($filepath);
-        exit;
+        if (file_exists($filepath) && pathinfo($filepath, PATHINFO_EXTENSION) === 'zip') {
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($filepath));
+            readfile($filepath);
+            exit;
+        }
+    } else {
+        Session::flash('backup_error', $language->get('admin', 'only_root_user_can_download_backups'));
+        Redirect::to(URL::build('/panel/core/backups'));
     }
 }
 
@@ -147,6 +153,7 @@ $template->getEngine()->addVariables([
     'DATE_CREATED' => $language->get('admin', 'date_created'),
     'ACTIONS' => $language->get('general', 'actions'),
     'FILE_SIZE' => $language->get('admin', 'file_size'),
+    'CAN_DOWNLOAD' => $user->data()->id == 1,
     'DOWNLOAD' => $language->get('admin', 'download'),
     'INFO' => $language->get('general', 'info'),
     'EXISTING' => $language->get('admin', 'existing_backups'),
