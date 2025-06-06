@@ -348,16 +348,11 @@ $private_profile = Settings::get('private_profile');
 $templates = [];
 $templates_query = DB::getInstance()->get('templates', ['enabled', 1])->results();
 
-$templates[] = [
-    'id' => 0,
-    'name' => $language->get('general', 'default'),
-    'active' => $user_query->theme_id === null
-];
 foreach ($templates_query as $item) {
     $templates[] = [
         'id' => Output::getClean($item->id),
         'name' => Output::getClean($item->name),
-        'active' => $item->id === $user_query->theme_id
+        'active' => $item->id === $user_query->theme_id || (!$user_query->theme_id && $item->name === Settings::get('default_template', 'DefaultRevamp')),
     ];
 }
 
