@@ -8,7 +8,7 @@ class Backup extends Task
     public const MANUAL_BACKUP = 'Manual Backup';
 
     private const EXCLUDED_DIRS = [
-        'backups',
+        'cache/backups',
         '.git'
     ];
 
@@ -22,7 +22,7 @@ class Backup extends Task
      */
     public function run(): string
     {
-        $backupsFolder = ROOT_PATH . '/backups/';
+        $backupsFolder = ROOT_PATH . '/cache/backups/';
 
         if (!$this->backupsFolderWritable($backupsFolder)) {
             return Task::STATUS_ERROR;
@@ -67,7 +67,7 @@ class Backup extends Task
 
     private function backupsFolderWritable(string $backupsFolder): bool
     {
-        if (!is_writable($backupsFolder)) {
+        if (is_dir($backupsFolder) && !is_writable($backupsFolder)) {
             $this->setOutput([
                 'error' => $backupsFolder . ' is not writable. Please check permissions.',
             ]);

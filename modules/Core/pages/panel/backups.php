@@ -75,7 +75,7 @@ if (Input::exists() && Input::get('action') == 'settings') {
     }
 }
 
-$backups_dir = ROOT_PATH . '/backups/';
+$backups_dir = ROOT_PATH . '/cache/backups/';
 
 // Handle download request
 if (isset($_GET['download']) && !empty($_GET['download'])) {
