@@ -36,7 +36,7 @@ class DatabaseInitialiser
         $this->_db->insert('groups', [
             'name' => 'Member',
             'group_html' => '<span class="badge badge-success">Member</span>',
-            'permissions' => '{"usercp.messaging":1,"usercp.signature":1,"usercp.nickname":1,"usercp.private_profile":1,"usercp.profile_banner":1,"profile.post":1}',
+            'permissions' => '{"usercp.messaging":1,"usercp.signature":1,"usercp.nickname":1,"usercp.title":1,"usercp.private_profile":1,"usercp.profile_banner":1,"profile.post":1}',
             'order' => 3,
         ]);
 
@@ -55,7 +55,7 @@ class DatabaseInitialiser
             'name' => 'Moderator',
             'group_html' => '<span class="badge badge-primary">Moderator</span>',
             'admin_cp' => true,
-            'permissions' => '{"modcp.ip_lookup":1,"modcp.punishments":1,"modcp.punishments.warn":1,"modcp.punishments.ban":1,"modcp.punishments.banip":1,"modcp.punishments.revoke":1,"modcp.reports":1,"admincp.users":1,"modcp.profile_banner_reset":1,"usercp.messaging":1,"usercp.signature":1,"usercp.private_profile":1,"usercp.nickname":1,"usercp.profile_banner":1,"profile.private.bypass":1,"profile.post":1}',
+            'permissions' => '{"modcp.ip_lookup":1,"modcp.punishments":1,"modcp.punishments.warn":1,"modcp.punishments.ban":1,"modcp.punishments.banip":1,"modcp.punishments.revoke":1,"modcp.reports":1,"admincp.users":1,"modcp.profile_banner_reset":1,"usercp.messaging":1,"usercp.signature":1,"usercp.private_profile":1,"usercp.nickname":1,"usercp.title":1,"usercp.profile_banner":1,"profile.private.bypass":1,"profile.post":1}',
             'order' => 2,
             'staff' => true,
         ]);
@@ -279,26 +279,23 @@ class DatabaseInitialiser
         $this->_db->insert('templates', [
             'name' => 'DefaultRevamp',
             'enabled' => true,
-            'is_default' => true,
         ]);
 
-        $this->_cache->setCache('templatecache');
-        $this->_cache->store('default', 'DefaultRevamp');
+        Settings::set('default_template', 'DefaultRevamp');
 
         $this->_db->insert('panel_templates', [
             'name' => 'Default',
             'enabled' => true,
-            'is_default' => true,
         ]);
-        $this->_cache->store('panel_default', 'Default');
+
+        Settings::set('default_panel_template', 'Default');
 
         $config_path = Config::get('core.path');
         if (!empty($config_path)) {
             $config_path = '/' . trim($config_path, '/');
         }
 
-        $this->_cache->setCache('backgroundcache');
-        $this->_cache->store('banner_image', $config_path . '/uploads/template_banners/homepage_bg_trimmed.jpg');
+        Settings::set('banner_image_path', $config_path . '/uploads/template_banners/homepage_bg_trimmed.jpg');
     }
 
     private function initialiseWidgets(): void
