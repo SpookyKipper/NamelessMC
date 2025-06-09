@@ -5,7 +5,7 @@
  * Handles user bans and IP bans enforcement.
  *
  * @package NamelessMC\Hooks
- * @author AI Assistant
+ * @author Aberdeener
  * @version 2.3.0
  * @license MIT
  */

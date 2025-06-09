@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\Request;
  * Enforces TFA requirements for users in groups that require it.
  *
  * @package NamelessMC\Hooks
- * @author AI Assistant
+ * @author Aberdeener
  * @version 2.3.0
  * @license MIT
  */

@@ -5,7 +5,7 @@
  * Redirects non-admin users when maintenance mode is enabled.
  *
  * @package NamelessMC\Hooks
- * @author AI Assistant
+ * @author Aberdeener
  * @version 2.3.0
  * @license MIT
  */

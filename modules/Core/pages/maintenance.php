@@ -1,10 +1,7 @@
 <?php
 /**
- * Maintenance mode page - proper route implementation.
- * This page replaces the old maintenance.php include file and provides
- * proper context initialization for the maintenance template.
+ * Maintenance mode page
  *
- * @author AI Assistant
  * @license MIT
  * @version 2.3.0
  *
