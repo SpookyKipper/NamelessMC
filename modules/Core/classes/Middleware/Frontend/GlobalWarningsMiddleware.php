@@ -9,7 +9,7 @@ class GlobalWarningsMiddleware extends AbstractMiddleware
 
     public function handle(User $user, Language $language, TemplateBase $template): void
     {
-        $warnings = DB::getInstance()->query('SELECT * FROM nl2_integrations WHERE punished = ? AND revoked = 0 AND acknowledged = 0', [$user->data()->id])->results();
+        $warnings = DB::getInstance()->query('SELECT * FROM nl2_infractions WHERE punished = ? AND revoked = 0 AND acknowledged = 0', [$user->data()->id])->results();
         foreach ($warnings as $warning) {
             $template->getEngine()->addVariables([
                 'GLOBAL_WARNING_TITLE' => $language->get('user', 'you_have_received_a_warning'),

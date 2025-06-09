@@ -40,8 +40,6 @@ if (
     }
 }
 
-MiddlewareHandler::getInstance()->call(MiddlewareType::Frontend, $container);
-
 if (defined('PAGE') && PAGE != 404) {
     // Auto unset signin tfa variables if set
     if (
@@ -60,6 +58,10 @@ if (file_exists(ROOT_PATH . '/custom/templates/' . TEMPLATE . '/template.php')) 
     /** @var TemplateBase $template */
     require(ROOT_PATH . '/custom/templates/DefaultRevamp/template.php');
 }
+
+$container->set(TemplateBase::class, $template);
+
+MiddlewareHandler::getInstance()->call(MiddlewareType::Frontend, $container);
 
 // Basic template variables
 $template->getEngine()->addVariables([
