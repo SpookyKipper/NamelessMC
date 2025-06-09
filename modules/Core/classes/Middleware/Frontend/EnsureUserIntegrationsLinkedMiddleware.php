@@ -2,10 +2,7 @@
 
 class EnsureUserIntegrationsLinkedMiddleware extends AbstractMiddleware
 {
-    public function type(): MiddlewareType
-    {
-        return MiddlewareType::Frontend;
-    }
+    public MiddlewareType $type = MiddlewareType::Frontend;
 
     public function handle(User $user, Language $language): void
     {

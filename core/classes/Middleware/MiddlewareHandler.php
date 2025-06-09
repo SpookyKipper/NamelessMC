@@ -1,6 +1,7 @@
 <?php
 
 use DI\Container;
+use Symfony\Component\HttpFoundation\Request;
 
 class MiddlewareHandler extends Instanceable
 {
@@ -35,8 +36,15 @@ class MiddlewareHandler extends Instanceable
 
         foreach ($middlewareClasses as $class) {
             $middleware = $container->get($class);
+            $request = $container->get(Request::class);
 
-            if ($middleware->type() === $type) {
+            foreach ($middleware->exemptRoutes as $exemptedRoute) {
+                if (str_starts_with($request->get('route'), $exemptedRoute)) {
+                    continue 2; // Skip this middleware if the route is exempted
+                }
+            }
+
+            if ($middleware->type === $type) {
                 $container->call([$middleware, 'handle']);
             }
         }

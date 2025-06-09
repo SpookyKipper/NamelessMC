@@ -1,7 +1,5 @@
 <?php
 
-use Symfony\Component\HttpFoundation\Request;
-
 /**
  * Maintenance Mode middleware hook.
  * Redirects non-admin users when maintenance mode is enabled.
@@ -13,7 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class MaintenanceModeMiddleware extends AbstractMiddleware
 {
-    private const EXEMPTED_ROUTES = [
+    public array $exemptRoutes = [
         '/maintenance',
         '/login',
         '/forgot_password',
@@ -23,12 +21,7 @@ class MaintenanceModeMiddleware extends AbstractMiddleware
         '/store/listener',
     ];
 
-    public function type(): MiddlewareType
-    {
-        return MiddlewareType::Global;
-    }
-
-    public function handle(User $user, Request $request): void
+    public function handle(User $user): void
     {
         // Check if maintenance mode is enabled
         if (!Settings::get('maintenance')) {
@@ -40,13 +33,6 @@ class MaintenanceModeMiddleware extends AbstractMiddleware
             // Display notice to admin stating maintenance mode is enabled
             define('BYPASS_MAINTENANCE', true);
             return;
-        }
-
-        $route = $request->get('route');
-        foreach (self::EXEMPTED_ROUTES as $exempted_route) {
-            if (str_starts_with($route, $exempted_route)) {
-                return;
-            }
         }
 
         Redirect::to(URL::build('/maintenance'));

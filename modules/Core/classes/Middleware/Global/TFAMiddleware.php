@@ -13,30 +13,16 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class TFAMiddleware extends AbstractMiddleware
 {
-    private const EXEMPTED_ROUTES = [
+    public array $exemptRoutes = [
         '/logout',
         '/user/settings' // Allow access to settings to enable TFA
     ];
-
-    public function type(): MiddlewareType
-    {
-        return MiddlewareType::Global;
-    }
 
     public function handle(User $user, Request $request, Language $language): void
     {
         // Only process for logged-in users
         if (!$user->isLoggedIn()) {
             return;
-        }
-
-        // Allow access to exempted routes
-        $route = $request->get('route');
-        foreach (self::EXEMPTED_ROUTES as $exempted_route) {
-            // Ideally we can use $request->getPathInfo(), but our routing allows a following slash
-            if (str_starts_with($route, $exempted_route)) {
-                return;
-            }
         }
 
         // Skip if AJAX request, such as Alert or PM checks

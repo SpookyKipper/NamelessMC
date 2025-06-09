@@ -11,11 +11,6 @@
  */
 class BannedUserMiddleware extends AbstractMiddleware
 {
-    public function type(): MiddlewareType
-    {
-        return MiddlewareType::Global;
-    }
-
     public function handle(User $user, Language $language): void
     {
         if (($user->isLoggedIn() && $user->data()->isbanned) || DB::getInstance()->get('ip_bans', ['ip', HttpUtils::getRemoteAddress()])->exists()) {

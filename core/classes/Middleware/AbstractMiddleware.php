@@ -2,5 +2,7 @@
 
 abstract class AbstractMiddleware
 {
-    abstract public function type(): MiddlewareType;
+    public MiddlewareType $type = MiddlewareType::Global;
+
+    public array $exemptRoutes = [];
 }
