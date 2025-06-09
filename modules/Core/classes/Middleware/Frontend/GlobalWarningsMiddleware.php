@@ -7,7 +7,7 @@ class GlobalWarningsMiddleware extends AbstractMiddleware
         return MiddlewareType::Frontend;
     }
 
-    public function execute(User $user, Language $language, TemplateBase $template): void
+    public function handle(User $user, Language $language, TemplateBase $template): void
     {
         $warnings = DB::getInstance()->query('SELECT * FROM nl2_integrations WHERE punished = ? AND revoked = 0 AND acknowledged = 0', [$user->data()->id])->results();
         foreach ($warnings as $warning) {

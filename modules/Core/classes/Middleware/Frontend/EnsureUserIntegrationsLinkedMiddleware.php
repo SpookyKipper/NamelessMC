@@ -7,7 +7,7 @@ class EnsureUserIntegrationsLinkedMiddleware extends AbstractMiddleware
         return MiddlewareType::Frontend;
     }
 
-    public function execute(User $user, Language $language): void
+    public function handle(User $user, Language $language): void
     {
         // Check if any integrations is required before user can continue
         if ($user->isLoggedIn() && defined('PAGE') && PAGE != 'cc_connections' && PAGE != 'oauth' && !(PAGE == 'cc_settings' && $_GET['do'] == 'enable_tfa')) {

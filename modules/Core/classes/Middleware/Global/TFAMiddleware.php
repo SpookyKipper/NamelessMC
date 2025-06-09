@@ -23,7 +23,7 @@ class TFAMiddleware extends AbstractMiddleware
         return MiddlewareType::Global;
     }
 
-    public function execute(User $user, Request $request, Language $language): void
+    public function handle(User $user, Request $request, Language $language): void
     {
         // Only process for logged-in users
         if (!$user->isLoggedIn()) {

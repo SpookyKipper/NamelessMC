@@ -28,7 +28,7 @@ class MaintenanceModeMiddleware extends AbstractMiddleware
         return MiddlewareType::Global;
     }
 
-    public function execute(User $user, Request $request): void
+    public function handle(User $user, Request $request): void
     {
         // Check if maintenance mode is enabled
         if (!Settings::get('maintenance')) {

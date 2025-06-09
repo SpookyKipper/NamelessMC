@@ -18,7 +18,7 @@ class BannedUserMiddleware extends AbstractMiddleware
         return MiddlewareType::Global;
     }
 
-    public function execute(User $user, Language $language): void
+    public function handle(User $user, Language $language): void
     {
         if (!$user->isLoggedIn() || !$user->data()->isbanned) {
             return;
