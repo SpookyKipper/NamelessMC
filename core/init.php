@@ -164,6 +164,8 @@ if ($page != 'install') {
         }
     }
 
+    $container->set(User::class, $user);
+
     // Check if we're in a subdirectory
     if (isset($directories)) {
         if (empty($directories[0])) {
