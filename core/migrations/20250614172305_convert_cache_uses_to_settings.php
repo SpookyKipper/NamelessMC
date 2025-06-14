@@ -27,24 +27,24 @@ final class ConvertCacheUsesToSettings extends AbstractMigration
 
         // Convert templatecache to use settings table
         $cache->setCache('templatecache');
-        $default_template = $cache->retrieve('default') ?: 'DefaultRevamp';
-        $default_panel_template = $cache->retrieve('panel_default') ?: 'Default';
+        $default_template = $cache->fetch('default', 'DefaultRevamp');
+        $default_panel_template = $cache->fetch('panel_default', 'Default');
         Settings::set('default_template', $default_template);
         Settings::set('default_panel_template', $default_panel_template);
 
         // Convert template_settings to use settings table
         $cache->setCache('template_settings');
-        $darkMode = $cache->retrieve('darkMode') ?: '0';
-        $navbarColour = $cache->retrieve('navbarColour') ?: 'white';
+        $darkMode = $cache->fetch('darkMode', '0');
+        $navbarColour = $cache->fetch('navbarColour', 'white');
         Settings::set('dark_mode', $darkMode);
         Settings::set('default_revamp_navbar_color', $navbarColour);
 
         // Convert backgroundcache to use settings table
         $cache->setCache('backgroundcache');
-        $logo_image = $cache->retrieve('logo_image') ?: '';
-        $banner_image = $cache->retrieve('banner_image') ?: '';
-        $og_image = $cache->retrieve('og_image') ?: '';
-        $favicon_image = $cache->retrieve('favicon_image') ?: '';
+        $logo_image = $cache->fetch('logo_image', '');
+        $banner_image = $cache->fetch('banner_image', '');
+        $og_image = $cache->fetch('og_image', '');
+        $favicon_image = $cache->fetch('favicon_image', '');
         Settings::set('logo_image_path', $logo_image);
         Settings::set('banner_image_path', $banner_image);
         Settings::set('og_image_path', $og_image);
@@ -52,14 +52,14 @@ final class ConvertCacheUsesToSettings extends AbstractMigration
 
         // Convert avatar_settings_cache to use settings table
         $cache->setCache('avatar_settings_cache');
-        $custom_avatars = $cache->retrieve('custom_avatars') ?? false;
-        $default_avatar_type = $cache->retrieve('default_avatar_type') ?: 'minecraft';
-        $default_avatar_image = $cache->retrieve('default_avatar_image') ?: '';
-        $default_avatar_source = $cache->retrieve('avatar_source') ?: 'cravatar';
+        $custom_avatars = $cache->fetch('custom_avatars', '0');
+        $default_avatar_type = $cache->fetch('default_avatar_type', 'minecraft');
+        $default_avatar_image = $cache->fetch('default_avatar_image', '');
+        $default_avatar_source = $cache->fetch('avatar_source', 'cravatar');
         if ($default_avatar_source === 'Nameless') {
             $default_avatar_source = 'cravatar';
         }
-        $default_avatar_perspective = $cache->retrieve('avatar_perspective') ?: 'face';
+        $default_avatar_perspective = $cache->fetch('avatar_perspective', 'face');
         Settings::set('custom_avatars', $custom_avatars);
         Settings::set('default_avatar_type', $default_avatar_type);
         Settings::set('default_avatar_image', $default_avatar_image);
@@ -68,14 +68,14 @@ final class ConvertCacheUsesToSettings extends AbstractMigration
 
         // Convert OnlineUsersWidget to use settings table
         $cache->setCache('online_members');
-        $use_nickname_show = $cache->fetch('show_nickname_instead', 0);
-        $include_staff = $cache->fetch('include_staff_in_users', 0);
+        $use_nickname_show = $cache->fetch('show_nickname_instead', '0');
+        $include_staff = $cache->fetch('include_staff_in_users', '0');
         Settings::set('online_users_widget_use_nicknames', $use_nickname_show);
         Settings::set('online_users_widget_include_staff', $include_staff);
 
         // Convert social_media to use settings table
         $cache->setCache('social_media');
-        $discord_widget_theme = $cache->retrieve('discord_widget_theme') ?: 'dark';
+        $discord_widget_theme = $cache->fetch('discord_widget_theme', 'dark');
         Settings::set('discord_widget_theme', $discord_widget_theme, 'Discord Integration');
     }
 }
