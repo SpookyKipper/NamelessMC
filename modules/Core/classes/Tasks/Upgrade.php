@@ -45,6 +45,9 @@ class Upgrade extends Task
             return Task::STATUS_FAILED;
         }
 
+        Settings::set('nameless_version', $updateCheck->versionTag());
+        Settings::set('version_update', null);
+
         $this->releaseLock();
 
         return Task::STATUS_COMPLETED;
