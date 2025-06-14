@@ -1,9 +1,4 @@
 <?php
-
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use Symfony\Component\Process\PhpExecutableFinder;
-use Symfony\Component\Process\Process;
-
 /**
  * Download and execute update task for NamelessMC
  *
