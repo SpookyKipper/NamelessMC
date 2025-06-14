@@ -149,10 +149,7 @@ class Upgrade extends Task
 
         $actualChecksum = hash_file('sha256', $upgradeZipPath);
         if ($actualChecksum === false) {
-            $this->setOutput([
-                'checksum_verify' => "Failed to calculate checksum for downloaded file: {$upgradeZipPath}"
-            ]);
-            return;
+            throw new Exception("Failed to calculate checksum for file: {$upgradeZipPath}");
         }
 
         if (hash_equals($expectedChecksum, $actualChecksum)) {
@@ -170,15 +167,17 @@ class Upgrade extends Task
 
     private function executeMigrations(): void
     {
-        $output = (new Phinx\Wrapper\TextWrapper(
+        $phinxWrapper = new Phinx\Wrapper\TextWrapper(
             new Phinx\Console\PhinxApplication(),
             [
             'configuration' => __DIR__ . '/../../../migrations/phinx.php',
             ]
-        ))->getMigrate();
+        );
 
-       if (!str_contains($output, 'All Done')) {
-            throw new Exception("Migration failed: {$output}");
+        $output = $phinxWrapper->getMigrate();
+
+       if ($phinxWrapper->getExitCode() !== 0) {
+            throw new Exception("Migrations failed: {$output}");
         }
 
         $this->setOutput([
