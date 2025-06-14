@@ -18,16 +18,8 @@ class Upgrade extends Task
             $this->acquireLock();
 
             $updateCheck = $this->validateUpdateAvailable();
-            if (!$updateCheck) {
-                $this->releaseLock();
-                return Task::STATUS_FAILED;
-            }
 
             $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
-            if (!$upgradeZipPath) {
-                $this->releaseLock();
-                return Task::STATUS_FAILED;
-            }
 
             $this->extractUpgradePackage($upgradeZipPath);
 
