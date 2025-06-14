@@ -13,55 +13,50 @@ class Upgrade extends Task
 
     public function run(): string
     {
-        // Acquire lock to prevent concurrent upgrades
-        if (!$this->acquireLock()) {
-            return Task::STATUS_FAILED;
-        }
+        try {
+            // Acquire lock to prevent concurrent upgrades
+            $this->acquireLock();
 
-        $updateCheck = $this->validateUpdateAvailable();
-        if (!$updateCheck) {
+            $updateCheck = $this->validateUpdateAvailable();
+            if (!$updateCheck) {
+                $this->releaseLock();
+                return Task::STATUS_FAILED;
+            }
+
+            $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
+            if (!$upgradeZipPath) {
+                $this->releaseLock();
+                return Task::STATUS_FAILED;
+            }
+
+            $this->extractUpgradePackage($upgradeZipPath);
+
+            $this->executeMigrations();
+
+            Settings::set('nameless_version', $updateCheck->versionTag());
+            Settings::set('version_update', null);
+
+            $this->releaseLock();
+
+        } catch (Exception $e) {
+            $this->setOutput(['error' => $e->getMessage()]);
             $this->releaseLock();
             return Task::STATUS_FAILED;
         }
-
-        $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
-        if (!$upgradeZipPath) {
-            $this->releaseLock();
-            return Task::STATUS_FAILED;
-        }
-
-        if (!$this->extractUpgradePackage($upgradeZipPath)) {
-            $this->releaseLock();
-            return Task::STATUS_FAILED;
-        }
-
-        if (!$this->executeMigrations()) {
-            $this->releaseLock();
-            return Task::STATUS_FAILED;
-        }
-
-        Settings::set('nameless_version', $updateCheck->versionTag());
-        Settings::set('version_update', null);
-
-        $this->releaseLock();
 
         return Task::STATUS_COMPLETED;
     }
 
-    private function acquireLock(): bool
+    private function acquireLock(): void
     {
         $lockFile = ROOT_PATH . '/cache/upgrade.lock';
         if (file_exists($lockFile)) {
-            $this->setOutput(['error' => 'Upgrade is already running']);
-            return false;
+            throw new Exception('Upgrade is already running');
         }
 
         if (!file_put_contents($lockFile, 'locked')) {
-            $this->setOutput(['error' => 'Failed to create lock file']);
-            return false;
+            throw new Exception('Failed to create lock file');
         }
-
-        return true;
     }
 
     private function releaseLock(): void
@@ -75,9 +70,9 @@ class Upgrade extends Task
     /**
      * Validate that an update is available
      *
-     * @return UpdateCheck|null Returns UpdateCheck object if update available, null otherwise
+     * @return UpdateCheck Returns UpdateCheck object
      */
-    private function validateUpdateAvailable(): ?UpdateCheck
+    private function validateUpdateAvailable(): UpdateCheck
     {
         $cache = new Cache([
             'name' => 'nameless',
@@ -89,8 +84,7 @@ class Upgrade extends Task
         $updateCheck = $cache->retrieve('update_check');
 
         if (!$updateCheck) {
-            $this->setOutput(['update_check' => 'No update available']);
-            return null;
+            throw new Exception('No update found');
         }
 
         $this->setOutput(['update_check' => "Found update: {$updateCheck->versionTag()}"]);
@@ -103,7 +97,7 @@ class Upgrade extends Task
      * @param UpdateCheck $updateCheck The update information
      * @return string|null Returns path to downloaded file, or null on failure
      */
-    private function downloadUpgradePackage(UpdateCheck $updateCheck): ?string
+    private function downloadUpgradePackage(UpdateCheck $updateCheck): string
     {
         $upgradeZipPath = $this->getTempDirectory() . DIRECTORY_SEPARATOR . "namelessmc-upgrade-{$updateCheck->versionTag()}.zip";
 
@@ -113,45 +107,34 @@ class Upgrade extends Task
         ]);
 
         if ($downloadResponse->hasError()) {
-            $this->setOutput([
-                'zip_download' => "Error downloading upgrade zip: {$downloadResponse->getError()}"
-            ]);
-            return null;
+            throw new Exception("Error downloading upgrade zip: {$downloadResponse->getError()}");
         }
 
         $this->setOutput([
             'zip_download' => "Downloaded upgrade zip to: {$upgradeZipPath}"
         ]);
 
-        if (!$this->verifyChecksum($upgradeZipPath, $updateCheck)) {
-            return null;
-        }
+        $this->verifyChecksum($upgradeZipPath, $updateCheck);
 
         return $upgradeZipPath;
     }
 
-    public function extractUpgradePackage(string $upgradeZipPath): bool
+    public function extractUpgradePackage(string $upgradeZipPath): void
     {
         $zip = new ZipArchive();
         if ($zip->open($upgradeZipPath) !== true) {
-            $this->setOutput([
-                'zip_extract' => "Failed to open upgrade zip: {$upgradeZipPath}"
-            ]);
-            return false;
+            throw new Exception("Failed to open upgrade zip: {$upgradeZipPath}");
         }
 
         // Extract to the root directory of the NamelessMC installation
         if (!$zip->extractTo(ROOT_PATH)) {
-            $this->setOutput([
-                'zip_extract' => "Failed to extract upgrade zip: {$upgradeZipPath}"
-            ]);
-            return false;
+            throw new Exception("Failed to extract upgrade zip: {$upgradeZipPath}");
         }
 
         $zip->close();
         $this->setOutput(['zip_extract' => 'Upgrade package extracted successfully']);
 
-        return true;
+        return;
     }
 
     /**
@@ -159,9 +142,8 @@ class Upgrade extends Task
      *
      * @param string $upgradeZipPath Path to the downloaded upgrade package
      * @param UpdateCheck $updateCheck The update information containing expected checksum
-     * @return bool True if checksum matches, false otherwise
      */
-    private function verifyChecksum(string $upgradeZipPath, UpdateCheck $updateCheck): bool
+    private function verifyChecksum(string $upgradeZipPath, UpdateCheck $updateCheck): void
     {
         $expectedChecksum = $updateCheck->checksum();
 
@@ -170,7 +152,7 @@ class Upgrade extends Task
             $this->setOutput([
                 'checksum_verify' => 'No checksum provided for verification, skipping checksum check'
             ]);
-            return true;
+            return;
         }
 
         $actualChecksum = hash_file('sha256', $upgradeZipPath);
@@ -178,28 +160,23 @@ class Upgrade extends Task
             $this->setOutput([
                 'checksum_verify' => "Failed to calculate checksum for downloaded file: {$upgradeZipPath}"
             ]);
-            return false;
+            return;
         }
 
         if (hash_equals($expectedChecksum, $actualChecksum)) {
             $this->setOutput([
                 'checksum_verify' => "Checksum verification passed (SHA256: {$actualChecksum})"
             ]);
-            return true;
+            return;
         }
-
-        $this->setOutput([
-            'checksum_verify' => "Checksum verification failed! Expected: {$expectedChecksum}, Got: {$actualChecksum}"
-        ]);
 
         // Remove the corrupted file
         unlink($upgradeZipPath);
-        $this->setOutput(['checksum_verify' => 'Removed corrupted download file']);
 
-        return false;
+        throw new Exception("Checksum verification failed: expected {$expectedChecksum}, got {$actualChecksum}");
     }
 
-    private function executeMigrations(): bool
+    private function executeMigrations(): void
     {
         $output = (new Phinx\Wrapper\TextWrapper(
             new Phinx\Console\PhinxApplication(),
@@ -209,17 +186,12 @@ class Upgrade extends Task
         ))->getMigrate();
 
        if (!str_contains($output, 'All Done')) {
-            $this->setOutput([
-                'migrations' => "Migrations failed: {$output}"
-            ]);
-            return false;
+            throw new Exception("Migration failed: {$output}");
         }
 
         $this->setOutput([
             'migrations' => $output,
         ]);
-
-        return true;
     }
 
     /**
