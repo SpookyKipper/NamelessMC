@@ -28,12 +28,14 @@ class Upgrade extends Task
             Settings::set('nameless_version', $updateCheck->versionTag());
             Settings::set('version_update', null);
 
-            $this->releaseLock();
-
+            $this->deleteUpgradeZip($upgradeZipPath);
         } catch (Exception $e) {
             $this->setOutput(['error' => $e->getMessage()]);
-            $this->releaseLock();
+
             return Task::STATUS_FAILED;
+        } finally {
+            // Ensure the lock is released even if an error occurs
+            $this->releaseLock();
         }
 
         return Task::STATUS_COMPLETED;
@@ -59,11 +61,6 @@ class Upgrade extends Task
         }
     }
 
-    /**
-     * Validate that an update is available
-     *
-     * @return UpdateCheck Returns UpdateCheck object
-     */
     private function validateUpdateAvailable(): UpdateCheck
     {
         $cache = new Cache([
@@ -83,15 +80,9 @@ class Upgrade extends Task
         return $updateCheck;
     }
 
-    /**
-     * Download the upgrade package to temporary directory
-     *
-     * @param UpdateCheck $updateCheck The update information
-     * @return string|null Returns path to downloaded file, or null on failure
-     */
     private function downloadUpgradePackage(UpdateCheck $updateCheck): string
     {
-        $upgradeZipPath = $this->getTempDirectory() . DIRECTORY_SEPARATOR . "namelessmc-upgrade-{$updateCheck->versionTag()}.zip";
+        $upgradeZipPath = $this->getTempDirectory() . "/namelessmc-upgrade-{$updateCheck->versionTag()}.zip";
 
         $downloadResponse = HttpClient::get($updateCheck->upgradeZipLink(), [
             'sink' => $upgradeZipPath,
@@ -118,28 +109,19 @@ class Upgrade extends Task
             throw new Exception("Failed to open upgrade zip: {$upgradeZipPath}");
         }
 
-        // Extract to the root directory of the NamelessMC installation
         if (!$zip->extractTo(ROOT_PATH)) {
             throw new Exception("Failed to extract upgrade zip: {$upgradeZipPath}");
         }
 
         $zip->close();
         $this->setOutput(['zip_extract' => 'Upgrade package extracted successfully']);
-
-        return;
     }
 
-    /**
-     * Verify the checksum of the downloaded upgrade package
-     *
-     * @param string $upgradeZipPath Path to the downloaded upgrade package
-     * @param UpdateCheck $updateCheck The update information containing expected checksum
-     */
     private function verifyChecksum(string $upgradeZipPath, UpdateCheck $updateCheck): void
     {
         $expectedChecksum = $updateCheck->checksum();
 
-        // Skip verification if no checksum is provided, this should never happen in practice
+        // TODO: Remove before merging
         if (empty($expectedChecksum)) {
             $this->setOutput([
                 'checksum_verify' => 'No checksum provided for verification, skipping checksum check'
@@ -170,7 +152,7 @@ class Upgrade extends Task
         $phinxWrapper = new Phinx\Wrapper\TextWrapper(
             new Phinx\Console\PhinxApplication(),
             [
-            'configuration' => __DIR__ . '/../../../migrations/phinx.php',
+                'configuration' => __DIR__ . '/../../../migrations/phinx.php',
             ]
         );
 
@@ -185,11 +167,15 @@ class Upgrade extends Task
         ]);
     }
 
-    /**
-     * Get the appropriate temporary directory
-     *
-     * @return string Path to temporary directory
-     */
+    private function deleteUpgradeZip(string $upgradeZipPath): void
+    {
+        if (file_exists($upgradeZipPath) && !unlink($upgradeZipPath)) {
+            $this->setOutput(['delete_upgrade_zip' => 'Could not delete upgrade zip file']);
+        } else {
+            $this->setOutput(['delete_upgrade_zip' => 'Upgrade zip file deleted successfully']);
+        }
+    }
+
     private function getTempDirectory(): string
     {
         $tmpDir = ini_get('upload_tmp_dir');
