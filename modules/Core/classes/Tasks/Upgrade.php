@@ -203,30 +203,25 @@ class Upgrade extends Task
 
     private function executeMigrations(): bool
     {
-        $process = new Process([
-            (new PhpExecutableFinder())->find(), // returns '' locally, could be a laravel valet quirk? works if i hardcode full homebrew path
-            'vendor/bin/phinx',
-            'migrate',
-            '-c',
-            'core/migrations/phinx.php',
-        ]);
+        $output = (new Phinx\Wrapper\TextWrapper(
+            new Phinx\Console\PhinxApplication(),
+            [
+            'configuration' => __DIR__ . '/../../../migrations/phinx.php',
+            ]
+        ))->getMigrate();
 
-        $process->setWorkingDirectory(ROOT_PATH);
-
-        try {
-            $process->mustRun();
-        } catch (ProcessFailedException $e) {
+       if (!str_contains($output, 'All Done')) {
             $this->setOutput([
-                'migrations' => "Migrations failed: {$e->getMessage()}"
+                'migrations' => "Migrations failed: {$output}"
             ]);
             return false;
         }
 
         $this->setOutput([
-            'migrations' => $process->getOutput(),
+            'migrations' => $output,
         ]);
 
-        return $process->isSuccessful();
+        return true;
     }
 
     /**
