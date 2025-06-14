@@ -17,6 +17,8 @@ class Upgrade extends Task
             // Acquire lock to prevent concurrent upgrades
             $this->acquireLock();
 
+            Settings::set('maintenance', '1');
+
             $updateCheck = $this->validateUpdateAvailable();
 
             $upgradeZipPath = $this->downloadUpgradePackage($updateCheck);
@@ -27,8 +29,6 @@ class Upgrade extends Task
 
             Settings::set('nameless_version', $updateCheck->versionTag());
             Settings::set('version_update', null);
-
-            $this->deleteUpgradeZip($upgradeZipPath);
         } catch (Exception $e) {
             $this->setOutput(['error' => $e->getMessage()]);
 
@@ -36,6 +36,8 @@ class Upgrade extends Task
         } finally {
             // Ensure the lock is released even if an error occurs
             $this->releaseLock();
+
+            Settings::set('maintenance', '0');
         }
 
         return Task::STATUS_COMPLETED;
@@ -114,6 +116,10 @@ class Upgrade extends Task
         }
 
         $zip->close();
+
+        // Remove the zip file after extraction
+        unlink($upgradeZipPath);
+
         $this->setOutput(['zip_extract' => 'Upgrade package extracted successfully']);
     }
 
@@ -165,15 +171,6 @@ class Upgrade extends Task
         $this->setOutput([
             'migrations' => $output,
         ]);
-    }
-
-    private function deleteUpgradeZip(string $upgradeZipPath): void
-    {
-        if (file_exists($upgradeZipPath) && !unlink($upgradeZipPath)) {
-            $this->setOutput(['delete_upgrade_zip' => 'Could not delete upgrade zip file']);
-        } else {
-            $this->setOutput(['delete_upgrade_zip' => 'Upgrade zip file deleted successfully']);
-        }
     }
 
     private function getTempDirectory(): string
