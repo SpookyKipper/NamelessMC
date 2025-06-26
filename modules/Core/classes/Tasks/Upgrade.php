@@ -29,6 +29,10 @@ class Upgrade extends Task
 
             Settings::set('nameless_version', $updateCheck->versionTag());
             Settings::set('version_update', null);
+
+            $cache = $this->_container->get(Cache::class);
+            $cache->setCache('update_check');
+            $cache->store('update_check', null);
         } catch (Exception $e) {
             $this->setOutput(['error' => $e->getMessage()]);
 
@@ -65,11 +69,7 @@ class Upgrade extends Task
 
     private function validateUpdateAvailable(): UpdateCheck
     {
-        $cache = new Cache([
-            'name' => 'nameless',
-            'extension' => '.cache',
-            'path' => ROOT_PATH . '/cache/'
-        ]);
+        $cache = $this->_container->get(Cache::class);
 
         $cache->setCache('update_check');
         $updateCheck = $cache->retrieve('update_check');
@@ -158,7 +158,7 @@ class Upgrade extends Task
         $phinxWrapper = new Phinx\Wrapper\TextWrapper(
             new Phinx\Console\PhinxApplication(),
             [
-                'configuration' => __DIR__ . '/../../../migrations/phinx.php',
+                'configuration' => ROOT_PATH . '/core/migrations/phinx.php',
             ]
         );
 
