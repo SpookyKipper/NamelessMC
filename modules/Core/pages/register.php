@@ -194,7 +194,7 @@ if (Input::exists()) {
             ));
 
             if ($pre_registration_event->isCancelled()) {
-                $validation->addCustomError('email', $pre_registration_event->getCancelledReason());
+                $validation->addCustomError('custom', $pre_registration_event->getCancelledReason());
             }
 
             // Check if any integrations wanna modify the validation
