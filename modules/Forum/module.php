@@ -18,8 +18,8 @@ class Forum_Module extends Module {
 
         $name = 'Forum';
         $author = '<a href="https://samerton.dev" target="_blank" rel="nofollow noopener">Samerton</a>';
-        $module_version = '2.2.1';
-        $nameless_version = '2.2.1';
+        $module_version = '2.2.3';
+        $nameless_version = '2.2.3';
 
         parent::__construct($this, $name, $author, $module_version, $nameless_version);
 
@@ -67,7 +67,7 @@ class Forum_Module extends Module {
 
         EventHandler::registerListener(PrePostCreateEvent::class, [MentionsHook::class, 'preCreate']);
         EventHandler::registerListener(PrePostEditEvent::class, [MentionsHook::class, 'preEdit']);
-      
+
         EventHandler::registerListener(PreTopicCreateEvent::class, [MentionsHook::class, 'preCreate']);
         EventHandler::registerListener(PreTopicEditEvent::class, [MentionsHook::class, 'preEdit']);
 
@@ -79,7 +79,7 @@ class Forum_Module extends Module {
                 return [
                     $forum_language->get('forum', 'posts_title') =>
                         DB::getInstance()->query(
-                            'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ?',
+                            'SELECT COUNT(post_content) AS `count` FROM nl2_posts WHERE post_creator = ? AND deleted = 0',
                             [$member->data()->id]
                         )->first()->count,
                 ];
@@ -101,14 +101,12 @@ class Forum_Module extends Module {
         Notification::addType(
             'forum_topic_reply',
             $forum_language->get('forum', 'forum_topic_replies'),
-            Module::getIdFromName('Forum'),
             ['alert' => true, 'email' => true],
         );
 
         Notification::addType(
             'forum_topic_mention',
             $forum_language->get('forum', 'forum_topic_mentions'),
-            Module::getIdFromName('Forum'),
             ['alert' => true, 'email' => true],
         );
     }
@@ -148,27 +146,13 @@ class Forum_Module extends Module {
 
         // Add link to navbar
         $cache->setCache('nav_location');
-        if (!$cache->isCached('forum_location')) {
-            $link_location = 1;
-            $cache->store('forum_location', 1);
-        } else {
-            $link_location = $cache->retrieve('forum_location');
-        }
+        $link_location = $cache->fetch('forum_location', 1);
 
         $cache->setCache('navbar_order');
-        if (!$cache->isCached('forum_order')) {
-            $forum_order = 2;
-            $cache->store('forum_order', 2);
-        } else {
-            $forum_order = $cache->retrieve('forum_order');
-        }
+        $forum_order = $cache->fetch('forum_order', 2);
 
         $cache->setCache('navbar_icons');
-        if (!$cache->isCached('forum_icon')) {
-            $icon = '';
-        } else {
-            $icon = $cache->retrieve('forum_icon');
-        }
+        $icon = $cache->fetch('forum_icon', '');
 
         switch ($link_location) {
             case 1:
@@ -193,19 +177,6 @@ class Forum_Module extends Module {
 
         // Front end or back end?
         if (defined('FRONT_END')) {
-            // Global variables if user is logged in
-            if ($user->isLoggedIn()) {
-                // Basic user variables
-                $topic_count = DB::getInstance()->get('topics', ['topic_creator', $user->data()->id])->results();
-                $topic_count = count($topic_count);
-                $post_count = DB::getInstance()->get('posts', ['post_creator', $user->data()->id])->results();
-                $post_count = count($post_count);
-                $template->getEngine()->addVariable('LOGGED_IN_USER_FORUM', [
-                    'topic_count' => $topic_count,
-                    'post_count' => $post_count
-                ]);
-            }
-
             if (defined('PAGE') && PAGE == 'user_query') {
                 $user_id = $template->getEngine()->getVariable('USER_ID');
 
@@ -218,45 +189,13 @@ class Forum_Module extends Module {
                     ]);
                 }
             }
-
         } else {
             if (defined('BACK_END')) {
                 if ($user->hasPermission('admincp.forums')) {
-                    $cache->setCache('panel_sidebar');
-                    if (!$cache->isCached('forum_order')) {
-                        $order = 12;
-                        $cache->store('forum_order', 12);
-                    } else {
-                        $order = $cache->retrieve('forum_order');
-                    }
-
-                    if (!$cache->isCached('forum_settings_icon')) {
-                        $icon = '<i class="nav-icon fas fa-cogs"></i>';
-                        $cache->store('forum_settings_icon', $icon);
-                    } else {
-                        $icon = $cache->retrieve('forum_settings_icon');
-                    }
-
-                    $navs[2]->add('forum_divider', mb_strtoupper($this->_forum_language->get('forum', 'forum'), 'UTF-8'), 'divider', 'top', null, $order, '');
-                    $navs[2]->add('forum_settings', $this->_language->get('admin', 'settings'), URL::build('/panel/forums/settings'), 'top', null, $order + 0.1, $icon);
-
-                    if (!$cache->isCached('forum_icon')) {
-                        $icon = '<i class="nav-icon fas fa-comments"></i>';
-                        $cache->store('forum_icon', $icon);
-                    } else {
-                        $icon = $cache->retrieve('forum_icon');
-                    }
-
-                    $navs[2]->add('forums', $this->_forum_language->get('forum', 'forums'), URL::build('/panel/forums'), 'top', null, $order + 0.2, $icon);
-
-                    if (!$cache->isCached('forum_label_icon')) {
-                        $icon = '<i class="nav-icon fas fa-tags"></i>';
-                        $cache->store('forum_label_icon', $icon);
-                    } else {
-                        $icon = $cache->retrieve('forum_label_icon');
-                    }
-
-                    $navs[2]->add('forum_labels', $this->_forum_language->get('forum', 'labels'), URL::build('/panel/forums/labels'), 'top', null, $order + 0.3, $icon);
+                    $navs[2]->add('forum_divider', mb_strtoupper($this->_forum_language->get('forum', 'forum'), 'UTF-8'), 'divider', 'top', null, 12, '');
+                    $navs[2]->add('forum_settings', $this->_language->get('admin', 'settings'), URL::build('/panel/forums/settings'), 'top', null, 12.1, '<i class="nav-icon fas fa-cogs"></i>');
+                    $navs[2]->add('forums', $this->_forum_language->get('forum', 'forums'), URL::build('/panel/forums'), 'top', null, 12.2, '<i class="nav-icon fas fa-comments"></i>');
+                    $navs[2]->add('forum_labels', $this->_forum_language->get('forum', 'labels'), URL::build('/panel/forums/labels'), 'top', null, 12.3, '<i class="nav-icon fas fa-tags"></i>');
                 }
 
                 if (defined('PANEL_PAGE') && PANEL_PAGE == 'dashboard') {
@@ -291,10 +230,7 @@ class Forum_Module extends Module {
                     $latest_posts = $latest_posts->results();
 
                     $cache->setCache('dashboard_graph');
-                    if ($cache->isCached('forum_data')) {
-                        $data = $cache->retrieve('forum_data');
-
-                    } else {
+                    $data = $cache->fetch('forum_data', function () use ($latest_topics, $latest_posts) {
                         $data = [];
 
                         $data['datasets']['topics']['label'] = 'forum_language/forum/topics_title'; // for $forum_language->get('forum', 'topics_title');
@@ -324,17 +260,17 @@ class Forum_Module extends Module {
                         // Sort by date
                         ksort($data);
 
-                        $cache->store('forum_data', $data, 120);
-                    }
+                        return $data;
+                    }, 120);
 
                     Core_Module::addDataToDashboardGraph($this->_language->get('admin', 'overview'), $data);
 
                     // Dashboard stats
                     require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentTopics.php';
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($template->getEngine(), $this->_forum_language, $cache, $latest_topics_count));
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentTopicsItem($template->getEngine(), $this->_forum_language, $latest_topics_count));
 
                     require_once ROOT_PATH . '/modules/Forum/collections/panel/RecentPosts.php';
-                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($template->getEngine(), $this->_forum_language, $cache, $latest_posts_count));
+                    CollectionManager::addItemToCollection('dashboard_stats', new RecentPostsItem($template->getEngine(), $this->_forum_language, $latest_posts_count));
 
                 }
             }

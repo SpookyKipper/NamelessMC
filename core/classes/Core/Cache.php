@@ -28,7 +28,7 @@ class Cache
     /**
      * Whether to collect cache data.
      */
-    private bool $_record_collector = false;
+    private bool $_record_collector;
 
     /**
      * Create a new Cache instance.
@@ -47,8 +47,11 @@ class Cache
                 $this->setExtension($config['extension']);
             }
         }
+    }
 
-        $this->_record_collector = defined('DEBUGGING') && DEBUGGING && class_exists('DebugBar\DebugBar');
+    private function recordCollector(): bool
+    {
+        return $this->_record_collector ??= defined('PHPDEBUGBAR') && PHPDEBUGBAR && class_exists('DebugBar\DebugBar');
     }
 
     /**
@@ -88,11 +91,34 @@ class Cache
             $is_cached = false;
         }
 
-        if ($this->_record_collector) {
+        if ($this->recordCollector()) {
             CacheCollector::getInstance()->recordCheck("{$this->_cachename}:{$key}", $is_cached);
         }
 
         return $is_cached;
+    }
+
+    /**
+     * Retrieve the cache data or persist it if not found.
+     *
+     * @param  string $key        The key to retrieve
+     * @param  mixed  $data       The data to persist if not found
+     * @param  int    $expiration Expiration time in seconds
+     * @return mixed  The cached data or the persisted data
+     */
+    public function fetch(string $key, $data, int $expiration = 0)
+    {
+        if ($this->isCached($key)) {
+            return $this->retrieve($key);
+        }
+
+        if (is_callable($data)) {
+            $data = $data();
+        }
+
+        $this->store($key, $data, $expiration);
+
+        return $data;
     }
 
     /**
@@ -258,7 +284,7 @@ class Cache
         $cacheData = json_encode($dataArray);
         file_put_contents($this->getCacheDir(), $cacheData);
 
-        if ($this->_record_collector) {
+        if ($this->recordCollector()) {
             CacheCollector::getInstance()->recordSet("{$this->_cachename}:{$key}", $data, $expiration);
         }
 
@@ -279,7 +305,7 @@ class Cache
         $type = $timestamp ? 'time' : 'data';
 
         if (!isset($cachedData[$key][$type])) {
-            if ($this->_record_collector) {
+            if ($this->recordCollector()) {
                 CacheCollector::getInstance()->recordMiss("{$this->_cachename}:{$key}");
             }
 
@@ -289,7 +315,7 @@ class Cache
         if (!$timestamp) {
             $entry = $cachedData[$key];
             if ($entry && $this->_checkExpired($entry['time'], $entry['expire'])) {
-                if ($this->_record_collector) {
+                if ($this->recordCollector()) {
                     CacheCollector::getInstance()->recordMiss("{$this->_cachename}:{$key}");
                 }
 
@@ -299,7 +325,7 @@ class Cache
 
         $data = unserialize($cachedData[$key][$type]);
 
-        if ($this->_record_collector) {
+        if ($this->recordCollector()) {
             CacheCollector::getInstance()->recordHit("{$this->_cachename}:{$key}", $data);
         }
 
